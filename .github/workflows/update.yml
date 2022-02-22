@@ -1,0 +1,20 @@
+name: Update Tracks
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Update data
+        run: bash update.sh
+      - uses: EndBug/add-and-commit@v7
+        with:
+          author_name: R. Miles McCain
+          author_email: github@sendmiles.email
+          message: 'Update source'
