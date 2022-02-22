@@ -1,4 +1,4 @@
-name: Update Tracks
+name: Update Source
 
 on:
   schedule:
