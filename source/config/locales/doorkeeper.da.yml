@@ -1,0 +1,154 @@
+---
+da:
+  activerecord:
+    attributes:
+      doorkeeper/application:
+        name: Applikationsnavn
+        redirect_uri: Link
+        scopes: Områder
+        website: Applikationswebsted
+    errors:
+      models:
+        doorkeeper/application:
+          attributes:
+            redirect_uri:
+              fragment_present: kan ikke indeholde et fragment.
+              invalid_uri: skal være en gyldigt URI.
+              relative_uri: skal være en absolut URI.
+              secured_uri: skal være en HTTPS-/SSL-URI.
+  doorkeeper:
+    applications:
+      buttons:
+        authorize: Godkend
+        cancel: Afbryd
+        destroy: Destruér
+        edit: Redigér
+        submit: Indsend
+      confirmations:
+        destroy: Sikker?
+      edit:
+        title: Redigér applikation
+      form:
+        error: Ups! Tjek din formular for mulige fejl
+      help:
+        native_redirect_uri: Brug %{native_redirect_uri} til lokale tests
+        redirect_uri: Brug én linje pr. URI
+        scopes: Adskil omfang med mellemrum. Lad være tomt for standardomfang.
+      index:
+        application: Applikation
+        callback_url: Callback-URL
+        delete: Slet
+        empty: Du har ingen applikationer.
+        name: Navn
+        new: Ny applikation
+        scopes: Omfang
+        show: Vis
+        title: Dine applikationer
+      new:
+        title: Ny applikation
+      show:
+        actions: Handlinger
+        application_id: Klientnøgle
+        callback_urls: Callback-URL'er
+        scopes: Omfang
+        secret: Klienthemmelighed
+        title: 'Applikation: %{name}'
+    authorizations:
+      buttons:
+        authorize: Godkend
+        deny: Afvis
+      error:
+        title: En fejl opstod
+      new:
+        able_to: Den vil være i stand til
+        prompt: Applikationen %{client_name} anmoder om adgang til din konto
+        title: Godkendelse krævet
+      show:
+        title: Kopiér og indsæt denne godkendelseskode i applikationen.
+    authorized_applications:
+      buttons:
+        revoke: Ophæv
+      confirmations:
+        revoke: Sikker?
+      index:
+        application: Applikation
+        created_at: Godkendt
+        date_format: "%Y-%m-%d %H:%M:%S"
+        scopes: Omfang
+        title: Dine godkendte applikationer
+    errors:
+      messages:
+        access_denied: Ressourceejeren eller godkendelsesserveren afviste anmodningen.
+        credential_flow_not_configured: Ressourceejeradgangskodeakkreditiv flow mislykkedes grundet ikke-opsat Doorkeeper.configure.resource_owner_from_credentials.
+        invalid_client: Klientbekræftelse mislykkedes grundet en ukendt klient, ingen klientbekræftelse inkluderet, eller uunderstøttet bekræftelsesmetode.
+        invalid_grant: Den leverede godkendelse er ugyldig, udløbet, tilbagekaldt, matcher ikke omdirigerings-URI brugt i godkendelsesanmodningen, eller er udstedt til en anden klient.
+        invalid_redirect_uri: Inkluderede ormdirigerings-URI er ugyldig.
+        invalid_request:
+          missing_param: 'Mangler krævet parameter: %{value}.'
+          request_not_authorized: Anmodning skal godkendes. Krævet parameter til godkendelse af anmodning mangler eller er ugyldig.
+          unknown: Anmodningen mangler en krævet parametre, inkluderer en uunderstøttet parametre værdi eller er på anden vis fejlbehæftet.
+        invalid_resource_owner: De angivne ressourceejerakkreditiver er ugyldige, eller ressourceejer kunne ikke findes
+        invalid_scope: Det anmodede omfang er ugyldigt, ukendt eller fejlbehæftet.
+        invalid_token:
+          expired: Adgangstoken er udløbet
+          revoked: Adgangstoken er tilbagekaldt
+          unknown: Adgangstoken er ugyldig
+        resource_owner_authenticator_not_configured: Ressourceejer kunne ikke findes grundet ikke-opsat Doorkeeper.configure.resource_owner_authenticator.
+        server_error: Godkejdelsesserveren stødte på en uventet betingelse, der forhindrede den i at imødekomme anmodningen.
+        temporarily_unavailable: Godkendelsesserveren kan pt. ikke håndtere anmodningen grundet midlertidig overbelastning eller servervedligehold.
+        unauthorized_client: Klienten er ikke godkendt til at udføre denne anmodning via denne metode.
+        unsupported_grant_type: Godkendelsestypen understøttes ikke af godkendelsesserveren.
+        unsupported_response_type: Godkendelsesserveren understøtter ikke denne svartype.
+    flash:
+      applications:
+        create:
+          notice: Applikation oprettet.
+        destroy:
+          notice: Applikation slettet.
+        update:
+          notice: Applikation opdateret.
+      authorized_applications:
+        destroy:
+          notice: Applikation tilbagekaldt.
+    layouts:
+      admin:
+        nav:
+          applications: Applikationer
+          oauth2_provider: OAuth-udbyder
+      application:
+        title: OAuth-godkendelse krævet
+    scopes:
+      admin:read: læs al data på serveren
+      admin:read:accounts: læs sensitiv information fra alle konti
+      admin:read:reports: læs sensitiv information fra alle anmeldelser og anmeldte konti
+      admin:write: redigér al data på serveren
+      admin:write:accounts: udfør modereringshandlinger på konti
+      admin:write:reports: udfør modereringshandlinger på anmeldelser
+      follow: ændre kontorelationer
+      push: modtage dine push-notifikationer
+      read: læse alle dine kontodata
+      read:accounts: se kontooplysninger
+      read:blocks: se dine blokeringer
+      read:bookmarks: se dine bogmærker
+      read:favourites: se dine favoritter
+      read:filters: se dine filtre
+      read:follows: se, hvem du følger
+      read:lists: se dine lister
+      read:mutes: se dine tavsgørelser
+      read:notifications: se dine notifikationer
+      read:reports: se dine anmeldelser
+      read:search: søge på dine vegne
+      read:statuses: se alle statusser
+      write: ændre alle dine kontodata
+      write:accounts: ændre din profil
+      write:blocks: blokere konti og domæner
+      write:bookmarks: bogmærke statusser
+      write:favourites: favorisere statusser
+      write:filters: oprette filtre
+      write:follows: følge personer
+      write:lists: oprette lister
+      write:media: uploade multimediefiler
+      write:mutes: tavsgøre personer og konversationer
+      write:notifications: rydde dine notifikationer
+      write:reports: anmelde personer
+      write:statuses: udgive statusser
