@@ -1,0 +1,14 @@
+- content_for :page_title do
+  = t('admin.trending_truths.title')
+
+.filters
+  .filter-subset
+    %strong= t('admin.trending_truths.status')
+    %ul
+      %li= filter_link_to t('admin.trending_truths.all'), trending: nil
+      %li= filter_link_to t('admin.trending_truths.trending'), trending: 'true'
+
+- @statuses.each do |status|
+  = render 'status', status: status.proper
+- unless params[:trending]
+  = paginate @statuses

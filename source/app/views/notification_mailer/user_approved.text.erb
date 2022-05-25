@@ -1,0 +1,20 @@
+<%= t 'user_mailer.welcome.title', name: @resource.account.username %>
+
+<%= t 'user_mailer.welcome.full_handle' %> (<%= "@#{@resource.account.local_username_and_domain}" %>)
+<%= t 'user_mailer.welcome.full_handle_hint', instance: @instance %>
+
+===
+
+<%= t 'user_mailer.welcome.explanation' %>
+
+<%= t 'user_mailer.welcome.extra_step' %>
+
+---
+
+<%= t 'user_mailer.welcome.edit_profile_action' %>
+
+=> <%= settings_profile_url %>
+
+If you no longer wish to receive transactional emails go here: 
+
+<%= @url_string %>
