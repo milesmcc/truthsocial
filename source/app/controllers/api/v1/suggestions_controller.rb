@@ -12,7 +12,7 @@ class Api::V1::SuggestionsController < Api::BaseController
   end
 
   def destroy
-    suggestions_source.remove(current_account, params[:id])
+    AccountSuggestions.remove(current_account, params[:id])
     render_empty
   end
 

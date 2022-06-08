@@ -43,6 +43,9 @@ RSpec.describe Api::V1::BookmarksController, type: :controller do
       end
 
       context 'with read scope and valid resource owner' do
+        let (:status) { Fabricate(:status, account: user.account) }
+        let (:status_2) { Fabricate(:status, account: user.account, quote_id: status.id) }
+
         before do
           allow(controller).to receive(:doorkeeper_token) do
             Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'read')
@@ -50,12 +53,22 @@ RSpec.describe Api::V1::BookmarksController, type: :controller do
         end
 
         it 'shows bookmarks owned by the user' do
-          bookmarked_by_user = Fabricate(:bookmark, account: user.account)
+          bookmarked_by_user = Fabricate(:bookmark, account: user.account, status: status_2)
           bookmarked_by_others = Fabricate(:bookmark)
 
           get :index
 
           expect(assigns(:statuses)).to match_array [bookmarked_by_user.status]
+        end
+
+        it 'includes quoted status' do
+          bookmarked_by_user = Fabricate(:bookmark, account: user.account, status: status_2)
+          bookmarked_by_others = Fabricate(:bookmark)
+
+          get :index
+
+          expect(body_as_json.first[:quote][:id].to_i).to eq(status.id)
+          expect(body_as_json.first[:quote_id].to_i).to eq(status.id)
         end
 
         it 'adds pagination headers if necessary' do

@@ -3,11 +3,12 @@
 class Api::V1::Accounts::StatusesController < Api::BaseController
   before_action -> { authorize_if_got_token! :read, :'read:statuses' }
   before_action :set_account
+  before_action :require_authenticated_user!, unless: :allowed_public_access?
 
   after_action :insert_pagination_headers, unless: -> { truthy_param?(:pinned) }
 
   def index
-    @statuses = load_statuses
+    @statuses  = load_statuses
     render json: @statuses, each_serializer: REST::StatusSerializer, relationships: StatusRelationshipsPresenter.new(@statuses, current_user&.account_id)
   end
 
@@ -99,5 +100,9 @@ class Api::V1::Accounts::StatusesController < Api::BaseController
 
   def pagination_since_id
     @statuses.first.id
+  end
+
+  def allowed_public_access?
+    current_user || (action_name == 'index' && @account&.user&.unauth_visibility? && (truthy_param?(:exclude_replies) || truthy_param?(:only_media) || truthy_param?(:pinned)))
   end
 end

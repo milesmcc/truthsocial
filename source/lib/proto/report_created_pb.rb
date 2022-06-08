@@ -14,6 +14,10 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       optional :comment, :string, 6
       repeated :status_ids, :int64, 7
       repeated :rule_ids, :int64, 8
+      optional :status_id, :int64, 9
+      optional :report_set_id, :string, 10
+      repeated :image_ids, :int64, 11
+      repeated :video_ids, :int64, 12
     end
   end
 end

@@ -777,6 +777,15 @@ RSpec.describe Account, type: :model do
       end
     end
 
+    describe 'suspend!' do
+      it 'suspends if email block already exists' do
+        user_1 = Fabricate(:user, email: 'foo.1@gmail.com')
+        user_2 = Fabricate(:user, email: 'fo.o1@gmail.com')
+        user_1.account.suspend!
+        user_2.account.suspend!
+      end
+    end
+
     describe 'local' do
       it 'returns an array of accounts who do not have a domain' do
         account_1 = Fabricate(:account, domain: nil)

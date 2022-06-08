@@ -75,7 +75,9 @@ class Api::V1::NotificationsController < Api::BaseController
   def exclude_types
     val = params.permit(exclude_types: [])[:exclude_types] || []
     val = [val] unless val.is_a?(Enumerable)
-    val
+    val_with_groups = val.clone
+    val.each { |n| val_with_groups << "#{n}_group"}
+    val_with_groups
   end
 
   def from_account

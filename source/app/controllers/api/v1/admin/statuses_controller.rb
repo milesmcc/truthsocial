@@ -20,18 +20,21 @@ class Api::V1::Admin::StatusesController < Api::BaseController
   def sensitize
     @status.update!(sensitive: true)
     log_action :update, @status
+    invalidate_cache
     render json: @status
   end
 
   def desensitize
     @status.update!(sensitive: false)
     log_action :update, @status
+    invalidate_cache
     render json: @status
   end
 
   def undiscard
     @status.update!(deleted_at: nil, deleted_by_id: nil)
     log_action :update, @status
+    invalidate_cache
     render json: @status
   end
 
@@ -41,6 +44,7 @@ class Api::V1::Admin::StatusesController < Api::BaseController
     RemovalWorker.perform_async(@status.id, redraft: true, notify_user: resource_params[:notify_user], immediate: false)
     @status.account.statuses_count = @status.account.statuses_count - 1
     @status.account.save
+    invalidate_cache
     render json: @status, serializer: REST::Admin::StatusSerializer, source_requested: true
   end
 
@@ -53,4 +57,10 @@ class Api::V1::Admin::StatusesController < Api::BaseController
   def resource_params
     params.permit(:sensitive, :moderator_id, :notify_user)
   end
+
+  def invalidate_cache
+    Rails.cache.delete(@status)
+    InvalidateSecondaryCacheService.new.call("InvalidateStatusCacheWorker", @status.id)
+  end
+
 end

@@ -61,7 +61,17 @@ class AccountSearchService < BaseService
   end
 
   def follower_search
-    account.followers.where("LOWER(username) LIKE ?", "%" + query.downcase + "%").limit(20)
+    account.followers.where('LOWER(username) LIKE ?', '%' + query.downcase + '%').limit(20)
+  end
+
+  def fields    
+    if likely_username?
+      %w(acct.edge_ngram acct)
+    elsif likely_display_name?
+      %w(display_name.edge_ngram display_name^100)
+    else
+      %w(acct.edge_ngram acct^2 display_name.edge_ngram display_name^2)
+    end
   end
 
   def simple_search_results
@@ -69,26 +79,18 @@ class AccountSearchService < BaseService
   end
 
   def from_elasticsearch
-    must_clauses   = [{ multi_match: { query: query, fields: likely_acct? ? %w(acct.edge_ngram acct) : %w(acct.edge_ngram acct display_name.edge_ngram display_name), type: 'most_fields', operator: 'and' } }]
-    should_clauses = []
+    fields_query = {
+      multi_match: {
+        query: query,
+        type: 'best_fields',
+        fields: fields,
+      },
+    }
 
-    if account
-      return [] if options[:following] && following_ids.empty?
-
-      if options[:following]
-        must_clauses << { terms: { id: following_ids } }
-      elsif following_ids.any?
-        should_clauses << { terms: { id: following_ids, boost: 100 } }
-      end
-      if options[:followers]
-        must_clauses << { terms: { id: follower_ids } }
-      end
-    end
-
-    query     = { bool: { must: must_clauses, should: should_clauses } }
     functions = [reputation_score_function, followers_score_function, time_distance_function]
 
-    records = AccountsIndex.query(function_score: { query: query, functions: functions, boost_mode: 'multiply', score_mode: 'avg' })
+    records = AccountsIndex.query(function_score: { query: fields_query, functions: functions, boost_mode: 'multiply', score_mode: 'multiply' })
+                           .filter(SearchService::PROHIBITED_FILTERS)
                            .limit(limit_for_non_exact_results)
                            .offset(offset)
                            .objects
@@ -115,7 +117,8 @@ class AccountSearchService < BaseService
     {
       field_value_factor: {
         field: 'followers_count',
-        modifier: 'log2p',
+        modifier: likely_display_name? ? 'ln1p' : 'square',
+        factor: 1,
         missing: 0,
       },
     }
@@ -154,10 +157,15 @@ class AccountSearchService < BaseService
   end
 
   def username_complete?
-    query.include?('@') && "@#{query}".match?(/\A#{Account::MENTION_RE}\Z/)
+    @username_complete ||= likely_username? && "@#{query}".match?(/\A#{Account::MENTION_RE}\Z/)
   end
 
-  def likely_acct?
-    @acct_hint || username_complete?
+  def likely_display_name?
+    @likely_display_name ||= query.split(/\w/).length.positive?
   end
+
+  def likely_username?
+    @acct_hint
+  end
+
 end

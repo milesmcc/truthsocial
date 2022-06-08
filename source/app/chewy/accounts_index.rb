@@ -17,13 +17,15 @@ class AccountsIndex < Chewy::Index
     tokenizer: {
       edge_ngram: {
         type: 'edge_ngram',
-        min_gram: 1,
+        min_gram: 2,
         max_gram: 15,
       },
     },
   }
 
-  define_type ::Account.searchable.includes(:account_stat), delete_if: ->(account) { account.destroyed? || !account.searchable? } do
+  define_type ::Account.searchable.includes(:account_stat), delete_if: ->(account) {
+    account.destroyed? || !account.searchable?
+  } do
     root date_detection: false do
       field :id, type: 'long'
 
@@ -31,12 +33,12 @@ class AccountsIndex < Chewy::Index
         field :edge_ngram, type: 'text', analyzer: 'edge_ngram', search_analyzer: 'content'
       end
 
-      field :acct, type: 'text', analyzer: 'content', value: ->(account) { [account.username, account.domain].compact.join('@') } do
+      field :acct, type: 'text', analyzer: 'content', value: ->(account) { account.username } do
         field :edge_ngram, type: 'text', analyzer: 'edge_ngram', search_analyzer: 'content'
       end
 
-      field :following_count, type: 'long', value: ->(account) { account.following.local.count }
-      field :followers_count, type: 'long', value: ->(account) { account.followers.local.count }
+      field :following_count, type: 'long', value: ->(account) { account.following_count.negative? ? 0 : account.following_count }
+      field :followers_count, type: 'long', value: ->(account) { account.followers_count.negative? ? 0 : account.followers_count }
       field :last_status_at, type: 'date', value: ->(account) { account.last_status_at || account.created_at }
     end
   end

@@ -29,6 +29,28 @@ describe Api::V1::Accounts::FollowerAccountsController do
       expect([body_as_json[0][:id], body_as_json[1][:id]]).to match_array([alice.id.to_s, bob.id.to_s])
     end
 
+    it 'paginates in ascending order' do
+      follower = []
+      4.times do |i|
+        follower[i] = Fabricate(:account)
+        follower[i].follow!(account)
+      end
+
+      get :index, params: { account_id: account.id, limit: 2}
+      expect(body_as_json.size).to eq 2
+      expect([body_as_json[0][:id], body_as_json[1][:id]]).to match_array([alice.id.to_s, bob.id.to_s])
+      min_id = URI(response.headers['Link'].links.first.href).query.split('&').last.split('=').last
+      
+      get :index, params: { account_id: account.id, limit: 2, min_id: min_id}
+      expect(body_as_json.size).to eq 2
+      expect([body_as_json[0][:id], body_as_json[1][:id]]).to match_array([follower[0].id.to_s, follower[1].id.to_s])
+      min_id = URI(response.headers['Link'].links.first.href).query.split('&').last.split('=').last
+
+      get :index, params: { account_id: account.id, limit: 2, min_id: min_id}      
+      expect(body_as_json.size).to eq 2
+      expect([body_as_json[0][:id], body_as_json[1][:id]]).to match_array([follower[2].id.to_s, follower[3].id.to_s])
+    end
+
     it 'does not return blocked users' do
       user.account.block!(bob)
       get :index, params: { account_id: account.id, limit: 2 }

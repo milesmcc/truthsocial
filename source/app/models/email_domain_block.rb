@@ -3,11 +3,11 @@
 #
 # Table name: email_domain_blocks
 #
-#  id         :bigint(8)        not null, primary key
-#  domain     :string           default(""), not null
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
-#  parent_id  :bigint(8)
+#  id               :bigint(8)        not null, primary key
+#  domain           :string           default(""), not null
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  parent_id        :bigint(8)
 #
 
 class EmailDomainBlock < ApplicationRecord

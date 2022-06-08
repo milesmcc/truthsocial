@@ -8,8 +8,10 @@ class Api::V1::Statuses::FavouritesController < Api::BaseController
   before_action :set_status, only: [:create]
 
   def create
+    cached_status = cache_collection([@status], Status).first
     FavouriteService.new.call(current_account, @status)
-    render json: @status, serializer: REST::StatusSerializer
+    cached_status.status_stat.favourites_count =  cached_status.favourites_count + 1
+    render json: cached_status, serializer: REST::StatusSerializer, replica_reads: ['reblogged', 'muted', 'bookmarked']
   end
 
   def destroy

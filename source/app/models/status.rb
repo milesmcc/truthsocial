@@ -23,6 +23,7 @@
 #  in_reply_to_account_id :bigint(8)
 #  poll_id                :bigint(8)
 #  deleted_at             :datetime
+#  quote_id               :bigint(8)
 #  deleted_by_id          :bigint(8)
 #
 
@@ -43,7 +44,7 @@ class Status < ApplicationRecord
   # will be based on current time instead of `created_at`
   attr_accessor :override_timestamps
 
-  update_index 'statuses#status', :proper, unless: -> { reblog? }
+  update_index 'statuses#status', :proper, unless: -> { skip_indexing? }
 
   enum visibility: [:public, :unlisted, :private, :direct, :limited], _suffix: :visibility
 
@@ -56,6 +57,7 @@ class Status < ApplicationRecord
 
   belongs_to :thread, foreign_key: 'in_reply_to_id', class_name: 'Status', inverse_of: :replies, optional: true
   belongs_to :reblog, foreign_key: 'reblog_of_id', class_name: 'Status', inverse_of: :reblogs, optional: true
+  belongs_to :quote, foreign_key: 'quote_id', class_name: 'Status', inverse_of: :quoted, optional: true
 
   has_many :favourites, inverse_of: :status, dependent: :destroy
   has_many :bookmarks, inverse_of: :status, dependent: :destroy
@@ -64,6 +66,7 @@ class Status < ApplicationRecord
   has_many :mentions, dependent: :destroy, inverse_of: :status
   has_many :active_mentions, -> { active }, class_name: 'Mention', inverse_of: :status
   has_many :media_attachments, dependent: :nullify
+  has_many :quoted, foreign_key: 'quote_id', class_name: 'Status', inverse_of: :quote, dependent: :nullify
   has_many :moderation_records, dependent: :nullify
 
   has_and_belongs_to_many :tags
@@ -80,6 +83,7 @@ class Status < ApplicationRecord
   validates_with DisallowedHashtagsValidator
   validates :reblog, uniqueness: { scope: :account }, if: :reblog?
   validates :visibility, exclusion: { in: %w(direct limited) }, if: :reblog?
+  validates :quote_visibility, inclusion: { in: %w(public unlisted) }, if: :quote?
 
   accepts_nested_attributes_for :poll
 
@@ -130,31 +134,30 @@ class Status < ApplicationRecord
                      account: [:account_stat, :user],
                      active_mentions: { account: :account_stat },
                    ],
-                   thread: { account: :account_stat }
+                   quote: [
+                    :application,
+                    :tags,
+                    :preview_cards,
+                    :media_attachments,
+                    :conversation,
+                    :status_stat,
+                    account: [:account_stat, :user],
+                    active_mentions: { account: :account_stat },
+                  ],
+                   thread: [
+                    :application,
+                    :tags,
+                    :preview_cards,
+                    :media_attachments,
+                    account: [:account_stat, :user],
+                    active_mentions: { account: :account_stat },
+                  ]
 
   delegate :domain, to: :account, prefix: true
 
   REAL_TIME_WINDOW = 6.hours
 
-  def searchable_by(preloaded = nil)
-    ids = []
-
-    ids << account_id if local?
-
-    if preloaded.nil?
-      ids += mentions.where(account: Account.local, silent: false).pluck(:account_id)
-      ids += favourites.where(account: Account.local).pluck(:account_id)
-      ids += reblogs.where(account: Account.local).pluck(:account_id)
-      ids += bookmarks.where(account: Account.local).pluck(:account_id)
-    else
-      ids += preloaded.mentions[id] || []
-      ids += preloaded.favourites[id] || []
-      ids += preloaded.reblogs[id] || []
-      ids += preloaded.bookmarks[id] || []
-    end
-
-    ids.uniq
-  end
+  PROHIBITED_TERMS_ON_INDEX = ENV.fetch('PROHIBITED_TERMS_ON_INDEX', '').split(/,\s?/).freeze
 
   def reply?
     !in_reply_to_id.nil? || attributes['reply']
@@ -174,6 +177,14 @@ class Status < ApplicationRecord
 
   def trending?
     trending.present?
+  end
+
+  def quote?
+    !quote_id.nil? && quote
+  end
+
+  def quote_visibility
+    quote&.visibility
   end
 
   def within_realtime_window?
@@ -236,7 +247,7 @@ class Status < ApplicationRecord
     fields  = [spoiler_text, text]
     fields += preloadable_poll.options unless preloadable_poll.nil?
 
-    @emojis = CustomEmoji.from_text(fields.join(' '), account.domain)
+    @emojis = CustomEmoji.from_text(fields.join(' '), account.domain) + (quote? ? CustomEmoji.from_text([quote.spoiler_text, quote.text].join(' '), quote.account.domain) : [])
   end
 
   def replies_count
@@ -251,6 +262,15 @@ class Status < ApplicationRecord
     status_stat&.favourites_count || 0
   end
 
+  def skip_indexing?
+    reblog? || !((favourites_count + reblogs_count) % 20).zero?
+  end
+
+  def contains_prohibited_terms?
+    text_downcase = (text || '').downcase
+    PROHIBITED_TERMS_ON_INDEX.any? { |term| text_downcase.include? term }
+  end
+
   def increment_count!(key)
     update_status_stat!(key => public_send(key) + 1)
   end
@@ -259,7 +279,7 @@ class Status < ApplicationRecord
     update_status_stat!(key => [public_send(key) - 1, 0].max)
   end
 
-  after_create_commit  :increment_counter_caches
+  after_create_commit :increment_counter_caches
   after_destroy_commit :decrement_counter_caches
 
   after_create_commit :store_uri, if: :local?

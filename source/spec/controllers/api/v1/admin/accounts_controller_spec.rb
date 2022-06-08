@@ -206,7 +206,7 @@ RSpec.describe Api::V1::Admin::AccountsController, type: :controller do
 
       it 'sets the users waitlist position' do
         user = User.find_by(email: 'bob@example.com')
-        expect(user.waitlist_position).to eq(11343) 
+        expect(user.waitlist_position).to eq(11343)
       end
     end
 
@@ -401,7 +401,7 @@ RSpec.describe Api::V1::Admin::AccountsController, type: :controller do
     it_behaves_like 'forbidden for wrong role', 'user'
 
     it 'returns http success' do
-      expect(response).to have_http_status(302)
+      expect(response).to have_http_status(200)
     end
 
     it 'unsuspends account' do

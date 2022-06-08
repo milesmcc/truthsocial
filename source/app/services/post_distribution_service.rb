@@ -19,6 +19,6 @@ class PostDistributionService < BaseService
       rendered = Oj.dump(event: :update, payload: rendered)
     end
     Redis.current.lpush('elixir:distribution', Oj.dump(job_type: "status_created", status_id: status.id, rendered: rendered))
-    Rails.logger.info("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status.id}")
+    Rails.logger.debug("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status.id}")
   end
 end

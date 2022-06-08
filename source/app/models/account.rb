@@ -100,7 +100,7 @@ class Account < ApplicationRecord
   validates :display_name, length: { maximum: 30 }, if: -> { local? && will_save_change_to_display_name? }
   validates :note, note_length: { maximum: 500 }, if: -> { local? && will_save_change_to_note? }
   validates :fields, length: { maximum: 4 }, if: -> { local? && will_save_change_to_fields? }
-  
+
   validate :check_website_field_for_javascript
 
   scope :remote, -> { where.not(domain: nil) }
@@ -151,7 +151,12 @@ class Account < ApplicationRecord
 
   delegate :chosen_languages, to: :user, prefix: false, allow_nil: true
 
-  update_index('accounts#account', :self)
+  update_index 'accounts#account', :self
+
+  def contains_prohibited_terms?
+    user_and_display_name_downcase = "#{username} #{display_name}".downcase
+    Status::PROHIBITED_TERMS_ON_INDEX.any? { |term| user_and_display_name_downcase.include? term }
+  end
 
   def local?
     domain.nil?
@@ -245,8 +250,8 @@ class Account < ApplicationRecord
     transaction do
       create_deletion_request!
       update!(suspended_at: date, suspension_origin: origin)
-      create_canonical_email_block!
     end
+    create_canonical_email_block!
   end
 
   def unsuspend!
@@ -628,6 +633,8 @@ class Account < ApplicationRecord
     return unless local? && user_email.present?
 
     CanonicalEmailBlock.create(reference_account: self, email: user_email)
+  rescue ActiveRecord::RecordNotUnique
+    nil
   end
 
   def destroy_canonical_email_block!

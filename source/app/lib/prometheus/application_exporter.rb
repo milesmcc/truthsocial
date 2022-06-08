@@ -28,7 +28,9 @@ module Prometheus
     end
 
     def increment(metric, labels = {})
-      @counter_instances[metric]&.increment(labels)
+      return if Rails.env.test? || Rails.env.development?
+
+      @counter_instances[metric]&.increment(labels) 
     end
   end
 end

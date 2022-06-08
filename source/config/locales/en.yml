@@ -1458,9 +1458,9 @@ en:
       subject: Please confirm attempted sign in
       title: Sign in attempt
     status_removed:
-      explanation: You have a status that has been removed for violating Truth social community guidelines.
-      title: Your status has been removed
-      subject: Your status has been removed
+      explanation: You have a Truth that has been removed for violating Truth Social community guidelines.
+      title: Your Truth has been removed
+      subject: Your Truth has been removed
     warning:
       explanation:
         ban_html: After careful review we have decided to delete your account permanently due to Truth social community guidelines violations. If you feel we have made an error, you can file an appeal with %{email}.
@@ -1468,6 +1468,7 @@ en:
         sensitive_html: Your uploaded media files and linked media will be treated as sensitive.
         silence_html: You can still use your account but only people who are already following you will see your posts on this server, and you may be excluded from various public listings. However, others may still manually follow you.
         suspend_html: Your account is suspended and will be inaccessible for %{suspension_duration}.
+        suspend_indefinite_html: Your account is suspended and will be inaccessible.
         verify_html: You're a certified member of the commumity
         unverify_html: You're no longer a certified member of the community
       get_in_touch: You can reply to this e-mail to get in touch with Truth Social.

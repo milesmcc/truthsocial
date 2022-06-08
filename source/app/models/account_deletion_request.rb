@@ -10,7 +10,7 @@
 #  updated_at :datetime         not null
 #
 class AccountDeletionRequest < ApplicationRecord
-  DELAY_TO_DELETION = 30.days.freeze
+  DELAY_TO_DELETION = 180.days.freeze
 
   belongs_to :account
 

@@ -2,7 +2,7 @@
 class NotifyServiceWorker
   include Sidekiq::Worker
 
-  def perform(recipient, type, activity)
-    NotifyService.call(recipient, type, activity)
+  def perform(account_id, type, status_id)
+    NotifyService.new.call(Account.find(account_id), type, Status.find(status_id))
   end
 end

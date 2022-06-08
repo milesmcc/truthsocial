@@ -33,10 +33,10 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
   end
 
   def paginated_follows
-    Follow.where(target_account: @account).paginate_by_max_id(
+    Follow.where(target_account: @account).paginate_by_min_id(
       limit_param(DEFAULT_ACCOUNTS_LIMIT),
-      params[:max_id],
-      params[:since_id]
+      params[:min_id],
+      params[:max_id]
     )
   end
 
@@ -46,13 +46,13 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
 
   def next_path
     if records_continue?
-      api_v1_account_followers_url pagination_params(max_id: pagination_max_id)
+      api_v1_account_followers_url pagination_params(min_id: pagination_max_id)
     end
   end
 
   def prev_path
     unless @accounts.empty?
-      api_v1_account_followers_url pagination_params(since_id: pagination_since_id)
+      api_v1_account_followers_url pagination_params(max_id: pagination_min_id)
     end
   end
 
@@ -60,7 +60,7 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
     @accounts.last.active_relationships.first.id
   end
 
-  def pagination_since_id
+  def pagination_min_id
     @accounts.first.active_relationships.first.id
   end
 

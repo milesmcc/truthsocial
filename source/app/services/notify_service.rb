@@ -13,10 +13,11 @@ class NotifyService < BaseService
   def call(recipient, type, activity)
     @recipient    = recipient
     @activity     = activity
+    @type         = type
     @notification = Notification.new(account: @recipient, type: type, activity: @activity)
     return if recipient.user.nil? || blocked?
 
-    @target_status = @notification.target_status
+    @target_status = target_status
     if group_notification?
       group_notifications_service.call(recipient.id, @notification.from_account_id, type, @target_status)
       return false
@@ -90,11 +91,11 @@ class NotifyService < BaseService
   end
 
   def direct_message?
-    message? && @notification.target_status.direct_visibility?
+    message? && target_status.direct_visibility?
   end
 
   def response_to_recipient?
-    @notification.target_status.in_reply_to_account_id == @recipient.id && @notification.target_status.thread&.direct_visibility?
+    target_status.in_reply_to_account_id == @recipient.id && target_status.thread&.direct_visibility?
   end
 
   def from_staff?
@@ -141,8 +142,8 @@ class NotifyService < BaseService
   end
 
   def conversation_muted?
-    if @notification.target_status
-      @recipient.muting_conversation?(@notification.target_status.conversation)
+    if target_status
+      @recipient.muting_conversation?(target_status.conversation)
     else
       false
     end
@@ -154,7 +155,7 @@ class NotifyService < BaseService
 
   def push_to_conversation!
     return if @notification.activity.nil?
-    AccountConversation.add_status(@recipient, @notification.target_status)
+    AccountConversation.add_status(@recipient, target_status)
   end
 
   def send_email!
@@ -200,4 +201,10 @@ class NotifyService < BaseService
   def group_notifications_service
     GroupNotificationsService.new
   end
+
+  def target_status
+    return @activity.status if %i[mention favourite].include? @type
+    @notification.target_status
+  end
+
 end

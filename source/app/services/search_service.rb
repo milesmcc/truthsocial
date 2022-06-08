@@ -1,12 +1,19 @@
 # frozen_string_literal: true
 
+require 'new_relic/agent/method_tracer'
+
 class SearchService < BaseService
+  include ::NewRelic::Agent::MethodTracer
+
+  PROHIBITED_TERMS = ENV.fetch('PROHIBITED_TERMS', '').split(',').freeze
+  PROHIBITED_FILTERS = { bool: { must_not: PROHIBITED_TERMS.map { |term| { multi_match: { type: 'most_fields', query: term } } } } }.freeze
+
   def call(query, account, limit, options = {})
-    @query   = query&.strip
+    @query = query&.strip
     @account = account
     @options = options
-    @limit   = limit.to_i
-    @offset  = options[:type].blank? ? 0 : options[:offset].to_i
+    @limit = limit.to_i
+    @offset = options[:type].blank? ? 0 : options[:offset].to_i
     @resolve = options[:resolve] || false
 
     default_results.tap do |results|
@@ -33,29 +40,60 @@ class SearchService < BaseService
       offset: @offset
     )
   end
+  add_method_tracer :perform_accounts_search!, 'SearchService/perform_accounts_search!'
 
   def perform_statuses_search!
-    definition = parsed_query.apply(StatusesIndex.filter(term: { searchable_by: @account.id }))
+    functions = [activity_score_function, time_distance_function]
 
-    if @options[:account_id].present?
-      definition = definition.filter(term: { account_id: @options[:account_id] })
-    end
+    text_field_query = { multi_match: { query: @query, fields: %w(text.stemmed text), type: 'most_fields', operator: 'and' } }
+    function_score_query = { query: text_field_query, functions: functions, boost_mode: 'multiply', score_mode: 'multiply' }
 
+    id_range = {}
     if @options[:min_id].present? || @options[:max_id].present?
-      range      = {}
-      range[:gt] = @options[:min_id].to_i if @options[:min_id].present?
-      range[:lt] = @options[:max_id].to_i if @options[:max_id].present?
-      definition = definition.filter(range: { id: range })
+      id_range[:gt] = @options[:min_id].to_i if @options[:min_id].present?
+      id_range[:lt] = @options[:max_id].to_i if @options[:max_id].present?
     end
 
-    results             = definition.limit(@limit).offset(@offset).objects.compact
-    account_ids         = results.map(&:account_id)
-    account_domains     = results.map(&:account_domain)
+    results = StatusesIndex
+                .query(function_score: function_score_query)
+                .filter(range: { id: id_range })
+                .filter(PROHIBITED_FILTERS)
+                .limit(@limit)
+                .offset(@offset)
+                .objects
+                .compact
+
+    account_ids = results.map(&:account_id)
+    account_domains = results.map(&:account_domain)
     preloaded_relations = relations_map_for_account(@account, account_ids, account_domains)
 
     results.reject { |status| StatusFilter.new(status, @account, preloaded_relations).filtered? }
   rescue Faraday::ConnectionFailed, Parslet::ParseFailed
     []
+  end
+  add_method_tracer :perform_statuses_search!, 'SearchService/perform_statuses_search!'
+
+  def time_distance_function
+    {
+      gauss: {
+        created_at: {
+          scale: '7d',
+          offset: '6d',
+          decay: 0.4,
+        },
+      },
+    }
+  end
+
+  def activity_score_function
+    {
+      field_value_factor: {
+        field: 'activity',
+        modifier: 'ln2p',
+        factor: 4.0,
+        missing: 0,
+      },
+    }
   end
 
   def perform_hashtags_search!
@@ -66,6 +104,7 @@ class SearchService < BaseService
       exclude_unreviewed: @options[:exclude_unreviewed]
     )
   end
+  add_method_tracer :perform_hashtags_search!, 'SearchService/perform_hashtags_search!'
 
   def default_results
     { accounts: [], hashtags: [], statuses: [] }

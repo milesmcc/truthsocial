@@ -17,8 +17,11 @@ class FavouriteService < BaseService
 
     favourite = Favourite.create!(account: account, status: status)
 
-    create_notification(favourite)
-    bump_potential_friendship(account, status)
+    read_from_replica do
+      create_notification(favourite)
+      bump_potential_friendship(account, status)
+    end
+
     export_prometheus_metric
 
     favourite

@@ -43,7 +43,7 @@ module CacheConcern
       uncached = klass.where(id: uncached_ids).with_includes.index_by(&:id)
 
       uncached.each_value do |item|
-        Rails.cache.write(item, item)
+        Rails.cache.write(item, item, expires_in: 60.minutes)
       end
     end
 

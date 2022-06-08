@@ -32,6 +32,8 @@ class UnfollowService < BaseService
 
     redis.del("whale:following:#{@source_account.id}") if @target_account.whale?
 
+    InvalidateSecondaryCacheService.new.call("InvalidateFollowCacheWorker", @source_account.id, @target_account.id, @target_account.whale?)
+
     follow
   end
 

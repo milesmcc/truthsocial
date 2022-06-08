@@ -39,7 +39,12 @@ class Tag < ApplicationRecord
   scope :recently_used, ->(account) { joins(:statuses).where(statuses: { id: account.statuses.select(:id).limit(1000) }).group(:id).order(Arel.sql('count(*) desc')) }
   scope :matches_name, ->(term) { where(arel_table[:name].lower.matches("#{sanitize_sql_like(Tag.normalize(term.downcase))}%", nil, true)) } # Search with case-sensitive to use B-tree index
 
-  update_index('tags#tag', :self)
+  update_index 'tags#tag', :self
+
+  def contains_prohibited_terms?
+    name_downcase = name.downcase
+    Status::PROHIBITED_TERMS_ON_INDEX.any? { |term| name_downcase.include? term }
+  end
 
   def to_param
     name

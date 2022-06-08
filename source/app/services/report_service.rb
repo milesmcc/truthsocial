@@ -36,10 +36,31 @@ class ReportService < BaseService
   end
 
   def publish_event!
-    Redis.current.publish(
-      ReportCreatedEvent::EVENT_KEY,
-      ReportCreatedEvent.new(@report).serialize
-    )
+    set_uuid = SecureRandom.uuid
+
+    if @report.status_ids.empty?
+      @report.status_ids << nil
+    end
+
+    @report.status_ids.each do |status_id|
+      attachments = MediaAttachment.where(status_id: status_id)
+
+      report_data = OpenStruct.new(
+        @report.attributes.merge(
+          status_id: status_id,
+          status_ids: @report.status_ids.compact,
+          report_set_id: set_uuid,
+          account_username: @report.account.username,
+          target_account_username: @report.target_account.username,
+          image_ids: attachments.select { |a| a.image? }.pluck(:id),
+          video_ids: attachments.select { |a| a.video? }.pluck(:id)
+        )
+      )
+      Redis.current.publish(
+        ReportCreatedEvent::EVENT_KEY,
+        ReportCreatedEvent.new(report_data).serialize
+      )
+    end
   end
 
   def notify_staff!

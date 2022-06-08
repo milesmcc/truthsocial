@@ -32,6 +32,6 @@ class DistributionWorker
       rendered = Oj.dump(event: :update, payload: rendered)
     end
     Redis.current.lpush('elixir:distribution', Oj.dump(status_id: status_id, rendered: rendered))
-    Rails.logger.info("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status_id}")
+    Rails.logger.debug("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status_id}")
   end
 end

@@ -4,10 +4,14 @@
 
 <% unless @warning.none_action? %>
   <% if @warning.action == "suspend" %>
-      <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: mail_to(Setting.site_contact_email, nil), suspension_duration: ActiveSupport::Duration.build(@suspension_policy.current_suspension_period).inspect %>
+    <% if @duration == :indefinite %>
+      <%= t "user_mailer.warning.explanation.#{@warning.action}_indefinite_html", email: mail_to(Setting.site_contact_email, nil) %>
     <% else %>
-      <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: Setting.site_contact_email %>
+      <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: mail_to(Setting.site_contact_email, nil), suspension_duration: ActiveSupport::Duration.build(@duration).inspect %>
     <% end %>
+  <% else %>
+    <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: Setting.site_contact_email %>
+  <% end %>
 <% end %>
 <%= @warning.text %>
 <% if !@statuses.nil? && !@statuses.empty? %>

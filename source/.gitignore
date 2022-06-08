@@ -79,3 +79,6 @@ dump.rdb
 
 # Open source CI directory
 /opensource/
+
+# Ignore generated test data file
+spec/support/examples/lib/csvs/accounts_for_suspension.csv

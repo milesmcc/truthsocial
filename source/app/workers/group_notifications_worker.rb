@@ -63,7 +63,7 @@ class GroupNotificationsWorker
     if type == "follow"
       activity = Follow.where(account_id: from_account_id, target_account_id: recipient.id).first
     else 
-      activity = Status.find(status_id)
+      activity = Status.find_by(id: status_id)
     end
     
     return unless activity

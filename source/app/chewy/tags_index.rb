@@ -23,7 +23,9 @@ class TagsIndex < Chewy::Index
     },
   }
 
-  define_type ::Tag.listable, delete_if: ->(tag) { tag.destroyed? || !tag.listable? } do
+  define_type ::Tag.listable, delete_if: ->(tag) {
+    tag.destroyed? || !tag.listable?
+  } do
     root date_detection: false do
       field :name, type: 'text', analyzer: 'content' do
         field :edge_ngram, type: 'text', analyzer: 'edge_ngram', search_analyzer: 'content'

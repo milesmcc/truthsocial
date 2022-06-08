@@ -58,7 +58,7 @@ class FeedInsertWorker
   add_method_tracer :perform_push, 'FeedInsertWorker/perform_push'
 
   def perform_notify
-    NotifyServiceWorker.perform_async(@follower, :status, @status)
+    NotifyServiceWorker.perform_async(@follower.id, :status, @status.id)
   end
   add_method_tracer :perform_notify, 'FeedInsertWorker/perform_notify'
 end

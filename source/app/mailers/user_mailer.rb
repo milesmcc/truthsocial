@@ -149,14 +149,15 @@ class UserMailer < Devise::Mailer
     end
   end
 
-  def warning(user, warning, status_ids = nil)
+  def warning(user, warning, status_ids = nil, duration = nil)
     @resource = user
     @warning  = warning
     @instance = Rails.configuration.x.local_domain
     @statuses = Status.where(id: status_ids).includes(:account) if status_ids.is_a?(Array)
+    @duration = duration
 
-    if @warning.action == "suspend"
-      @suspension_policy = AccountSuspensionPolicy.new(user.account)
+    if @warning.action == 'suspend' && @duration.nil?
+      @duration = AccountSuspensionPolicy.new(user.account).current_suspension_period
     end
 
     I18n.with_locale(@resource.locale || I18n.default_locale) do

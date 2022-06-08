@@ -25,6 +25,6 @@ class Api::V2::SearchController < Api::BaseController
   end
 
   def search_params
-    params.permit(:type, :offset, :min_id, :max_id, :account_id)
+    params.permit(:type, :offset, :min_id, :max_id, :account_id, :q, :resolve, :exclude_unreviewed, :limit)
   end
 end

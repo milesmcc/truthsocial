@@ -92,12 +92,14 @@ class Rack::Attack
     end
 
     throttle('throttle_password_resets/ip', limit: 25, period: 5.minutes) do |req|
-      req.remote_ip if req.post? && %w(/auth/password /api/pleroma/change_password).include?(req.path)
+      req.remote_ip if req.post? && %w(/auth/password /api/pleroma/change_password /api/v1/truth/password_reset/request).include?(req.path)
     end
 
     throttle('throttle_password_resets/email', limit: 5, period: 30.minutes) do |req|
       (req.params.dig('user', 'email').presence if req.post? && req.path == '/auth/password') ||
-      (req.params.dig('email').presence if req.post? && req.path == '/api/pleroma/change_password')
+      (req.params.dig('email').presence if req.post? && req.path == '/api/pleroma/change_password') ||
+      (req.params.dig('email').presence if req.post? && req.path == '/api/v1/truth/password_reset/request')
+
     end
 
     throttle('throttle_email_confirmations/ip', limit: 25, period: 5.minutes) do |req|

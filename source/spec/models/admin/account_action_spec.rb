@@ -9,13 +9,56 @@ RSpec.describe Admin::AccountAction, type: :model do
     let(:target_account) { Fabricate(:account, user: Fabricate(:user)) }
     let(:type)           { 'disable' }
     let(:base64_attachment) { "data:image/jpeg;base64,#{Base64.encode64(attachment_fixture("attachment.jpg").read)}" }
+    let(:duration)       { nil }
 
     before do
       account_action.assign_attributes(
         type:            type,
         current_account: account,
-        target_account:  target_account
+        target_account:  target_account,
+        duration: duration
       )
+    end
+
+    context 'type is "approve"' do
+      let(:type) { "approve" }
+
+      before do
+        target_account.user.update!(approved: false)
+      end
+
+      it "approves user" do
+        Sidekiq::Testing.inline! do
+          subject
+        end
+        expect(target_account.user.reload).to be_approved
+      end
+    end
+
+    context 'type is "verify"' do
+      let(:type) { "verify" }
+
+      it "verifies user" do
+        Sidekiq::Testing.inline! do
+          subject
+        end
+        expect(target_account.reload).to be_verified
+      end
+    end
+
+    context 'type is "unverify"' do
+      let(:type) { "unverify" }
+
+      before do
+        target_account.verify!
+      end
+
+      it "approves user" do
+        Sidekiq::Testing.inline! do
+          subject
+        end
+        expect(target_account.reload).to_not be_verified
+      end
     end
 
     context 'type is "ban"' do
@@ -112,6 +155,26 @@ RSpec.describe Admin::AccountAction, type: :model do
         expect(target_account).to be_suspended
       end
 
+      context 'with numeric duration' do
+        let(:duration ) { 100 }
+        it 'suspends account for a the duration' do
+          Sidekiq::Testing.fake! {subject}
+
+          expect(target_account).to be_suspended
+          expect(Time.at(Admin::UnsuspensionWorker.jobs[0]["at"].truncate).utc).to be_within(5.second).of(100.days.from_now)
+        end
+      end
+
+      context 'with indefinite duration' do
+        let(:duration ) { "indefinite" }
+        it "suspends account and doesn't enqueue a unsuspension job" do
+          Sidekiq::Testing.fake! {subject}
+
+          expect(target_account).to be_suspended
+          expect(Admin::UnsuspensionWorker.jobs.size).to eq(0)
+        end
+      end
+
       it 'queues Admin::SuspensionWorker by 1' do
         Sidekiq::Testing.fake! do
           expect do
@@ -124,7 +187,7 @@ RSpec.describe Admin::AccountAction, type: :model do
         Sidekiq::Testing.fake! do
           expect do
             subject
-          end.to change { Admin::SuspensionWorker.jobs.size }.by 1
+          end.to change { Admin::UnsuspensionWorker.jobs.size }.by 1
         end
       end
 
@@ -202,8 +265,8 @@ RSpec.describe Admin::AccountAction, type: :model do
     context 'account.local?' do
       let(:account) { Fabricate(:account, domain: nil) }
 
-      it 'returns ["none", "ban", "disable", "remove_avatar", "remove_header", "sensitive", "silence", "unsilence", "suspend", "unsuspend", "verify"]' do
-        expect(subject).to eq %w(none ban disable remove_avatar remove_header sensitive silence unsilence suspend unsuspend verify)
+      it 'returns ["none", "ban", "disable", "remove_avatar", "remove_header", "sensitive", "silence", "unsilence", "suspend", "unsuspend", "unverify", "verify"]' do
+        expect(subject).to eq %w(approve none ban disable remove_avatar remove_header sensitive silence unsilence suspend unsuspend verify unverify)
       end
     end
 
@@ -211,7 +274,7 @@ RSpec.describe Admin::AccountAction, type: :model do
       let(:account) { Fabricate(:account, domain: 'hoge.com') }
 
       it 'returns ["ban", "remove_avatar", "remove_header", "sensitive", "silence", "unsilence", "suspend", "unsuspend", "verify"]' do
-        expect(subject).to eq %w(ban remove_avatar remove_header sensitive silence unsilence suspend unsuspend verify)
+        expect(subject).to eq %w(approve ban remove_avatar remove_header sensitive silence unsilence suspend unsuspend verify unverify)
       end
     end
   end

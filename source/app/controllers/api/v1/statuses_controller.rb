@@ -7,8 +7,8 @@ class Api::V1::StatusesController < Api::BaseController
   before_action -> { doorkeeper_authorize! :write, :'write:statuses' }, only:   [:create, :destroy]
   before_action :require_user!, except:  [:show, :context, :ancestors, :descendants]
   before_action :set_status, only:       [:show, :context, :ancestors, :descendants]
-  before_action :set_status, only:       [:show, :context, :ancestors, :descendants]
   before_action :set_thread, only:       [:create]
+  before_action :require_authenticated_user!, unless: :allowed_public_access?
   after_action :insert_pagination_headers, only: :descendants
 
   override_rate_limit_headers :create, family: :statuses
@@ -42,7 +42,7 @@ class Api::V1::StatusesController < Api::BaseController
   end
 
   def render_context_subitems(statuses)
-    render json: statuses, each_serializer: REST::StatusSerializer, relationships: StatusRelationshipsPresenter.new(statuses, current_user&.account_id)
+    render json: statuses, each_serializer: REST::StatusSerializer, relationships: StatusRelationshipsPresenter.new(statuses, current_user&.account_id), exclude_reply_previews: true
   end
 
   def create
@@ -57,6 +57,7 @@ class Api::V1::StatusesController < Api::BaseController
                                          scheduled_at: status_params[:scheduled_at],
                                          application: doorkeeper_token.application,
                                          poll: status_params[:poll],
+                                         quote_id: status_params[:quote_id],
                                          idempotency: request.headers['Idempotency-Key'],
                                          with_rate_limit: true)
 
@@ -99,6 +100,7 @@ class Api::V1::StatusesController < Api::BaseController
       :spoiler_text,
       :visibility,
       :scheduled_at,
+      :quote_id,
       to: [],
       media_ids: [],
       poll: [
@@ -130,7 +132,7 @@ class Api::V1::StatusesController < Api::BaseController
 
   def next_path
     unless @descendants.empty?
-      offset =  (params[:offset].to_i || 0) + PAGINATED_LIMIT
+      offset = (params[:offset].to_i || 0) + PAGINATED_LIMIT
       descendants_api_v1_status_url pagination_params(offset: offset)
     end
   end
@@ -139,4 +141,7 @@ class Api::V1::StatusesController < Api::BaseController
     FeedManager.instance.remove_from_whale(@status)
   end
 
+  def allowed_public_access?
+    current_user || (action_name == 'show' && @status&.account&.user&.unauth_visibility? && !@status&.reply?)
+  end
 end

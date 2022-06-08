@@ -12,11 +12,16 @@ RSpec.describe FetchLinkCardService, type: :service do
     stub_request(:get, 'https://github.com/qbi/WannaCry').to_return(status: 404)
     stub_request(:get, 'http://example.com/test-').to_return(request_fixture('idn.txt'))
     stub_request(:get, 'http://example.com/windows-1251').to_return(request_fixture('windows-1251.txt'))
+    stub_request(:get, "https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ").to_return(status: 200)
 
-    subject.call(status)
   end
 
   context 'in a local status' do
+
+    before do
+      subject.call(status)
+    end
+
     context do
       let(:status) { Fabricate(:status, text: 'Check out http://example.中国') }
 
@@ -85,10 +90,23 @@ RSpec.describe FetchLinkCardService, type: :service do
         expect(a_request(:get, 'http://example.com/sjis')).to_not have_been_made
       end
     end
+
+    context do
+      let(:status) { Fabricate(:status, text: 'Check out https://youtu.be/dQw4w9WgXcQ?t=5') }
+
+      it 'converts youtube short links to proper URL' do
+        expect(a_request(:get, 'https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ')).to have_been_made.at_least_once
+      end
+    end
+
   end
 
   context 'in a remote status' do
     let(:status) { Fabricate(:status, account: Fabricate(:account, domain: 'example.com'), text: 'Habt ihr ein paar gute Links zu <a>foo</a> #<span class="tag"><a href="https://quitter.se/tag/wannacry" target="_blank" rel="tag noopener noreferrer" title="https://quitter.se/tag/wannacry">Wannacry</a></span> herumfliegen?   Ich will mal unter <br> <a href="https://github.com/qbi/WannaCry" target="_blank" rel="noopener noreferrer" title="https://github.com/qbi/WannaCry">https://github.com/qbi/WannaCry</a> was sammeln. !<a href="http://sn.jonkman.ca/group/416/id" target="_blank" rel="noopener noreferrer" title="http://sn.jonkman.ca/group/416/id">security</a>&nbsp;') }
+
+    before do
+      subject.call(status)
+    end
 
     it 'parses out URLs' do
       expect(a_request(:get, 'https://github.com/qbi/WannaCry')).to have_been_made.at_least_once
@@ -98,4 +116,27 @@ RSpec.describe FetchLinkCardService, type: :service do
       expect(a_request(:get, 'https://quitter.se/tag/wannacry')).to_not have_been_made
     end
   end
+
+  context 'secondary datacenters' do
+    let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis') }
+
+    before do
+      allow(ENV).to receive(:fetch).with('SECONDARY_DCS', false).and_return('foo,bar')
+    end
+
+    it 'creates jobs for secondary datacenters' do
+      Sidekiq::Testing.fake! do
+
+        expect(Sidekiq::Queues['foo'].size).to eq(0)
+        expect(Sidekiq::Queues['bar'].size).to eq(0)
+        subject.call(status)
+
+        expect(Sidekiq::Queues['foo'].first['class']).to eq(InvalidateStatusCacheWorker.name)
+
+        expect(Sidekiq::Queues['foo'].size).to eq(1)
+        expect(Sidekiq::Queues['bar'].size).to eq(1)
+      end
+    end
+  end
+
 end

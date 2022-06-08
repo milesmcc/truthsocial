@@ -4,6 +4,7 @@ RSpec.describe Api::V1::StatusesController, type: :controller do
   render_views
 
   let(:user)  { Fabricate(:user, account: Fabricate(:account, username: 'alice')) }
+  let(:public_user) { Fabricate(:user, account: Fabricate(:account), unauth_visibility: true) }
   let(:app)   { Fabricate(:application, name: 'Test app', website: 'http://testapp.com') }
   let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, application: app, scopes: scopes) }
 
@@ -28,14 +29,24 @@ RSpec.describe Api::V1::StatusesController, type: :controller do
     describe 'GET #context' do
       let(:scopes) { 'read:statuses' }
       let(:status) { Fabricate(:status, account: user.account) }
+      let (:status_2) { Fabricate(:status, account: user.account) }
 
       before do
         Fabricate(:status, account: user.account, thread: status)
+        Fabricate(:status, account: user.account, thread: status_2, quote_id: status.id)
       end
 
       it 'returns http success' do
         get :context, params: { id: status.id }
         expect(response).to have_http_status(200)
+      end
+
+      it 'includes quote status and quote id http success' do
+        get :context, params: { id: status_2.id }
+        expect(response).to have_http_status(200)
+
+        expect(body_as_json[:descendants].first[:quote][:id].to_i).to eq(status.id)
+        expect(body_as_json[:descendants].first[:quote_id].to_i).to eq(status.id)
       end
     end
 
@@ -134,24 +145,24 @@ RSpec.describe Api::V1::StatusesController, type: :controller do
       end
     end
 
-    context 'with a public status' do
-      let(:status) { Fabricate(:status, account: user.account, visibility: :public) }
+    context 'with a public account' do
+      let(:public_status) { Fabricate(:status, account: public_user.account) }
 
       describe 'GET #show' do
         it 'returns http success' do
-          get :show, params: { id: status.id }
+          get :show, params: { id: public_status.id }
           expect(response).to have_http_status(200)
         end
       end
 
       describe 'GET #context' do
         before do
-          Fabricate(:status, account: user.account, thread: status)
+          Fabricate(:status, account: public_user.account, thread: public_status)
         end
 
         it 'returns http success' do
-          get :context, params: { id: status.id }
-          expect(response).to have_http_status(200)
+          get :context, params: { id: public_status.id }
+          expect(response).to have_http_status(401)
         end
       end
     end

@@ -2,6 +2,22 @@ require 'rails_helper'
 
 describe AccountSearchService, type: :service do
   describe '#call' do
+    context '@username queries' do
+      it 'return exact match' do
+        account = Fabricate(:account, username: 'match')
+
+        results = subject.call('@match', nil, limit: 10)
+        expect(results).to eq [account]
+      end
+
+      it 'do not return non-matches' do
+        account = Fabricate(:account, username: 'notevenclose')
+
+        results = subject.call('@match', nil, limit: 10)
+        expect(results).to eq []
+      end
+    end
+
     context 'with a query to ignore' do
       it 'returns empty array for missing query' do
         results = subject.call('', nil, limit: 10)

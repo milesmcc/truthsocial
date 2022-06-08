@@ -29,8 +29,10 @@ class FetchLinkCardService < BaseService
     @url = @url.to_s
 
     (@all_urls || [url]).each do |full_url|
-      url_domain = Addressable::URI.parse(full_url.to_s).normalized_host
-      Prometheus::ApplicationExporter::increment(:links, {domain: url_domain})
+      parsed_uri = Addressable::URI.parse(full_url.to_s)
+      check_known_short_links(parsed_uri)
+
+      Prometheus::ApplicationExporter::increment(:links, {domain: parsed_uri.normalized_host})
     end
 
     RedisLock.acquire(lock_options) do |lock|
@@ -53,6 +55,17 @@ class FetchLinkCardService < BaseService
   end
 
   private
+
+  def check_known_short_links(uri)
+    domain = uri.normalized_host
+    path = uri.omit(:scheme, :authority, :host).to_s[1..-1]
+
+    short_links = {
+      "youtu.be": "https://www.youtube.com/watch?v=#{path.sub('?', '&')}"
+    }
+
+    @url = short_links[domain.to_sym] if short_links[domain.to_sym]
+  end
 
   def publish_card_joined_event
     Redis.current.publish(
@@ -84,6 +97,7 @@ class FetchLinkCardService < BaseService
   def attach_card
     @status.preview_cards << @card
     Rails.cache.delete(@status)
+    InvalidateSecondaryCacheService.new.call("InvalidateStatusCacheWorker", @status.id)
   end
 
   def parse_urls
@@ -91,7 +105,7 @@ class FetchLinkCardService < BaseService
       @all_urls = @status.text.scan(URL_PATTERN).map { |array| Addressable::URI.parse(array[1]).normalize }
     else
       html  = Nokogiri::HTML(@status.text)
-      links = html.css('a')
+      links = html.css(':not(.quote-inline) > a')
       @all_urls  = links.filter_map { |a| Addressable::URI.parse(a['href']) unless skip_link?(a) }.filter_map(&:normalize)
     end
 

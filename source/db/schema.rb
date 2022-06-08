@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2022_04_18_211320) do
+ActiveRecord::Schema.define(version: 2022_05_25_140644) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -856,6 +856,7 @@ ActiveRecord::Schema.define(version: 2022_04_18_211320) do
     t.bigint "in_reply_to_account_id"
     t.bigint "poll_id"
     t.datetime "deleted_at"
+    t.bigint "quote_id"
     t.bigint "deleted_by_id"
     t.index ["account_id", "id", "visibility", "updated_at"], name: "index_statuses_20190820", order: { id: :desc }, where: "(deleted_at IS NULL)"
     t.index ["conversation_id"], name: "index_statuses_on_conversation_id"
@@ -863,6 +864,7 @@ ActiveRecord::Schema.define(version: 2022_04_18_211320) do
     t.index ["id", "account_id"], name: "index_statuses_public_20200119", order: { id: :desc }, where: "((deleted_at IS NULL) AND (visibility = 0) AND (reblog_of_id IS NULL) AND ((NOT reply) OR (in_reply_to_account_id = account_id)))"
     t.index ["in_reply_to_account_id"], name: "index_statuses_on_in_reply_to_account_id"
     t.index ["in_reply_to_id"], name: "index_statuses_on_in_reply_to_id"
+    t.index ["quote_id"], name: "index_statuses_on_quote_id"
     t.index ["reblog_of_id", "account_id"], name: "index_statuses_on_reblog_of_id_and_account_id"
     t.index ["uri"], name: "index_statuses_on_uri", unique: true
   end
@@ -972,6 +974,7 @@ ActiveRecord::Schema.define(version: 2022_04_18_211320) do
     t.integer "waitlist_position"
     t.boolean "unsubscribe_from_emails", default: false
     t.integer "ready_to_approve", default: 0
+    t.boolean "unauth_visibility"
     t.index ["account_id"], name: "index_users_on_account_id"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["created_by_application_id"], name: "index_users_on_created_by_application_id"

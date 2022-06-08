@@ -363,4 +363,20 @@ RSpec.describe Status, type: :model do
       expect(status.uri).to start_with('https://')
     end
   end
+
+  describe 'skip_indexing?' do
+    it 'skips indexing if a reblog or the retruths + counts is not a multiple of 20' do
+      subject.reblog = other
+      expect(subject.skip_indexing?).to be true
+    end
+    it 'do not skip indexing if a reblog or the retruths + counts is not a multiple of 20' do
+      expect(subject.skip_indexing?).to be false
+    end
+    it 'do skip indexing not a reblog and the retruths + counts is not a multiple of 20' do
+      Fabricate(:favourite, account: bob, status: subject)
+      Fabricate(:favourite, account: alice, status: subject)
+      expect(subject.skip_indexing?).to be true
+    end
+  end
+
 end

@@ -12,12 +12,23 @@ RSpec.describe Api::V1::MarkersController, type: :controller do
     before do
       Fabricate(:marker, timeline: 'home', last_read_id: 123, user: user)
       Fabricate(:marker, timeline: 'notifications', last_read_id: 456, user: user)
-
-      get :index, params: { timeline: %w(home notifications) }
+      get :index, params: { timeline: ["home", "notifications"].to_json }
     end
 
-    it 'returns http success' do
-      expect(response).to have_http_status(200)
+    context 'with JSON parameters' do
+      it 'returns http success' do
+        expect(response).to have_http_status(200)
+      end
+    end
+
+    context 'with Array parameters' do
+      before do 
+        get :index, params: { timeline: %w(home notifications) }
+      end
+
+      it 'returns http success' do
+        expect(response).to have_http_status(200)
+      end
     end
 
     it 'returns markers' do

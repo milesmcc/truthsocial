@@ -6,6 +6,7 @@ class Admin::AccountAction
   include Authorization
 
   TYPES = %w(
+    approve
     none
     ban
     disable
@@ -17,6 +18,7 @@ class Admin::AccountAction
     suspend
     unsuspend
     verify
+    unverify
   ).freeze
 
   attr_accessor :target_account,
@@ -26,7 +28,7 @@ class Admin::AccountAction
                 :report_id,
                 :warning_preset_id
 
-  attr_reader :warning, :send_email_notification, :include_statuses
+  attr_reader :warning, :send_email_notification, :include_statuses, :duration
 
   def send_email_notification=(value)
     @send_email_notification = ActiveModel::Type::Boolean.new.cast(value)
@@ -34,6 +36,15 @@ class Admin::AccountAction
 
   def include_statuses=(value)
     @include_statuses = ActiveModel::Type::Boolean.new.cast(value)
+  end
+
+  def duration=(value)
+    @duration =
+      if Integer(value, exception: false)
+        value.to_i.days
+      elsif value == 'indefinite'
+        :indefinite
+      end
   end
 
   def save!
@@ -69,6 +80,8 @@ class Admin::AccountAction
 
   def process_action!
     case type
+    when 'approve'
+      handle_approve!
     when 'enable'
       handle_enable!
     when 'disable'
@@ -81,6 +94,8 @@ class Admin::AccountAction
       handle_unsilence!
     when 'verify'
       handle_verify!
+    when 'unverify'
+      handle_unverify!
     when 'suspend'
       handle_suspend!
     when 'unsuspend'
@@ -126,11 +141,17 @@ class Admin::AccountAction
     end
   end
 
+  def handle_approve!
+    authorize(target_account.user, :approve?)
+    log_action(:approve, target_account.user)
+    target_account.user.approve!
+  end
+
   def handle_ban!
     authorize(target_account.user, :ban?)
     log_action(:ban, target_account.user)
     target_account.suspend!
-    Admin::AccountDeletionWorker.perform_async(target_account.id)
+    target_account.user.disable!
   end
 
   def handle_disable!
@@ -168,12 +189,7 @@ class Admin::AccountAction
     log_action(:suspend, target_account)
     target_account.suspend!(origin: :local)
 
-    if account_suspension_policy.strikes_expended?
-      # Commented out to avoid destroying evidence
-      # Admin::AccountDeletionWorker.perform_async(target_account.id)
-    else
-      schedule_unsuspension!
-    end
+    schedule_unsuspension! unless account_suspension_policy.strikes_expended?
   end
 
   def handle_unsuspend!
@@ -186,6 +202,12 @@ class Admin::AccountAction
     authorize(target_account, :verify?)
     log_action(:verify, target_account)
     target_account.verify!
+  end
+
+  def handle_unverify!
+    authorize(target_account, :unverify?)
+    log_action(:unverify, target_account)
+    target_account.unverify!
   end
 
   def handle_remove_avatar!
@@ -215,7 +237,7 @@ class Admin::AccountAction
   end
 
   def process_email!
-    UserMailer.warning(target_account.user, warning, status_ids).deliver_later! if warnable?
+    UserMailer.warning(target_account.user, warning, status_ids, duration).deliver_later! if warnable?
   end
 
   def warnable?
@@ -239,7 +261,13 @@ class Admin::AccountAction
   end
 
   def schedule_unsuspension!
-    Admin::UnsuspensionWorker.perform_at(account_suspension_policy.next_unsuspension_date, target_account.id)
+    if duration.is_a? Integer
+      Admin::UnsuspensionWorker.perform_at(duration.from_now, target_account.id)
+    elsif duration == :indefinite
+      # noop
+    else
+      Admin::UnsuspensionWorker.perform_at(account_suspension_policy.next_unsuspension_date, target_account.id)
+    end
   end
 
   def account_suspension_policy

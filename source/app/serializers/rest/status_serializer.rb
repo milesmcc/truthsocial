@@ -3,9 +3,11 @@
 class REST::StatusSerializer < ActiveModel::Serializer
   attributes :id, :created_at, :in_reply_to_id, :in_reply_to_account_id,
              :sensitive, :spoiler_text, :visibility, :language,
-             :uri, :url, :replies_count, :reblogs_count,
-             :favourites_count
+             :uri, :url
 
+  attribute :replies_count
+  attribute :reblogs_count
+  attribute :favourites_count
   attribute :favourited, if: :current_user?
   attribute :reblogged, if: :current_user?
   attribute :muted, if: :current_user?
@@ -14,6 +16,8 @@ class REST::StatusSerializer < ActiveModel::Serializer
 
   attribute :content, unless: :source_requested?
   attribute :text, if: :source_requested?
+
+  attribute :quote_id, if: -> { object.quote? }
 
   belongs_to :reblog, serializer: REST::StatusSerializer
   belongs_to :application, if: :show_application?
@@ -39,8 +43,14 @@ class REST::StatusSerializer < ActiveModel::Serializer
     object.in_reply_to_account_id&.to_s
   end
 
+  def quote_id
+    object.quote_id.to_s
+  end
+
   def current_user?
-    !current_user.nil?
+    if defined?(current_user)
+      !current_user.nil?
+    end
   end
 
   def show_application?
@@ -81,6 +91,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   def favourited
     if instance_options && instance_options[:relationships]
       instance_options[:relationships].favourites_map[object.id] || false
+    elsif instance_options && instance_options[:replica_reads] && instance_options[:replica_reads].include?('favourited')
+      read_from_replica do
+        current_user.account.favourited?(object)
+      end
     else
       current_user.account.favourited?(object)
     end
@@ -89,6 +103,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   def reblogged
     if instance_options && instance_options[:relationships]
       instance_options[:relationships].reblogs_map[object.id] || false
+    elsif instance_options && instance_options[:replica_reads] && instance_options[:replica_reads].include?('reblogged')
+      read_from_replica do
+        current_user.account.reblogged?(object)
+      end
     else
       current_user.account.reblogged?(object)
     end
@@ -97,6 +115,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   def muted
     if instance_options && instance_options[:relationships]
       instance_options[:relationships].mutes_map[object.conversation_id] || false
+    elsif instance_options && instance_options[:replica_reads] && instance_options[:replica_reads].include?('muted')
+      read_from_replica do
+        current_user.account.muting_conversation?(object.conversation)
+      end
     else
       current_user.account.muting_conversation?(object.conversation)
     end
@@ -105,6 +127,10 @@ class REST::StatusSerializer < ActiveModel::Serializer
   def bookmarked
     if instance_options && instance_options[:relationships]
       instance_options[:relationships].bookmarks_map[object.id] || false
+    elsif instance_options && instance_options[:replica_reads] && instance_options[:replica_reads].include?('bookmarked')
+      read_from_replica do
+        current_user.account.bookmarked?(object)
+      end
     else
       current_user.account.bookmarked?(object)
     end
@@ -166,4 +192,42 @@ class REST::StatusSerializer < ActiveModel::Serializer
       tag_url(object)
     end
   end
+end
+
+class REST::NestedQuoteSerializer < REST::StatusSerializer
+  attribute :quote do
+    nil
+  end
+  attribute :quote_muted, if: :current_user?
+
+  def quote_muted
+    if instance_options && instance_options[:account_relationships]
+      instance_options[:account_relationships].muting[object.account_id] ? true : false || instance_options[:account_relationships].blocking[object.account_id] || instance_options[:account_relationships].blocked_by[object.account_id] || instance_options[:account_relationships].domain_blocking[object.account_id] || false
+    else
+      current_user.account.muting?(object.account) || object.account.blocking?(current_user.account) || current_user.account.blocking?(object.account) || current_user.account.domain_blocking?(object.account.domain) 
+    end
+  end
+end
+
+class REST::InReplySerializer < REST::StatusSerializer
+  attribute :in_reply_to do
+    nil
+  end
+
+  attribute :favourites_count do
+    -1
+  end
+
+  attribute :reblogs_count do
+    -1
+  end
+
+  attribute :replies_count do
+    -1
+  end
+end
+
+class REST::StatusSerializer < ActiveModel::Serializer
+  belongs_to :quote, serializer: REST::NestedQuoteSerializer
+  belongs_to :thread, serializer: REST::InReplySerializer, key: :in_reply_to, if: -> { !@instance_options[:exclude_reply_previews] }
 end

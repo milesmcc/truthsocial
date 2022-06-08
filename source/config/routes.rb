@@ -586,6 +586,8 @@ Rails.application.routes.draw do
             post :resolve
           end
         end
+
+        resources :trending_statuses, only: [:index, :update, :destroy]
       end
     end
 

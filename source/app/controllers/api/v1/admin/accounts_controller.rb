@@ -169,7 +169,7 @@ class Api::V1::Admin::AccountsController < Api::BaseController
     authorize @account, :unverify?
     @account.unverify!
     log_action :unverify, @account
-    redirect_to admin_account_path(@account.id), notice: I18n.t('admin.accounts.unverified_msg', username: @account.acct)
+    render json: @account, serializer: REST::Admin::AccountSerializer
   end
 
   private

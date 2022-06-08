@@ -28,12 +28,14 @@ class PostStatusService < BaseService
     @options     = options
     @text        = @options[:text] || ''
     @in_reply_to = @options[:thread]
+    @quote_id    = @options[:quote_id]
     @mentions    = @options[:mentions] || []
 
     return idempotency_duplicate if idempotency_given? && idempotency_duplicate?
 
     validate_media!
     preprocess_attributes!
+    preprocess_quote!
 
     if scheduled?
       schedule_status!
@@ -61,6 +63,19 @@ class PostStatusService < BaseService
     )
   end
 
+  def status_from_uri(uri)
+    ActivityPub::TagManager.instance.uri_to_resource(uri, Status)
+  end
+
+  def quote_from_url(url)
+    return nil if url.nil?
+
+    quote = ResolveURLService.new.call(url)
+    status_from_uri(quote.uri) if quote
+  rescue
+    nil
+  end
+
   def preprocess_attributes!
     @sensitive    = (@options[:sensitive].nil? ? @account.user&.setting_default_sensitive : @options[:sensitive]) || @options[:spoiler_text].present?
     @text         = @options.delete(:spoiler_text) if @text.blank? && @options[:spoiler_text].present?
@@ -68,8 +83,22 @@ class PostStatusService < BaseService
     @visibility   = :unlisted if @visibility&.to_sym == :public && @account.silenced?
     @scheduled_at = @options[:scheduled_at]&.to_datetime
     @scheduled_at = nil if scheduled_in_the_past?
+
+    md = @text.match(/RT:\s*\[\s*(https:\/\/.+?)\s*\]/)
+
+    if @quote_id.nil? && md
+      @quote_id = quote_from_url(md[1])&.id
+      @text.sub!(/RT:\s*\[.*?\]/, '')
+    end
   rescue ArgumentError
     raise ActiveRecord::RecordInvalid
+  end
+
+  def preprocess_quote!
+    if @quote_id.present?
+      quote = Status.find(@quote_id)
+      @quote_id = quote.reblog_of_id.to_s if quote.reblog?
+    end
   end
 
   def process_status!
@@ -190,6 +219,7 @@ class PostStatusService < BaseService
       language: language_from_option(@options[:language]) || @account.user&.setting_default_language&.presence || LanguageDetector.instance.detect(@text, @account),
       application: @options[:application],
       rate_limit: @options[:with_rate_limit],
+      quote_id: @quote_id,
     }.compact
   end
 
