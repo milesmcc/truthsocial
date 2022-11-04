@@ -1,0 +1,4 @@
+---
+:concurrency: 5
+:queues:
+  - [delta-smelt-1]

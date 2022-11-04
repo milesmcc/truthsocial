@@ -1,0 +1,45 @@
+---
+io:
+  activerecord:
+    attributes:
+      doorkeeper/application:
+        name: Nomo
+        redirect_uri: URI di plussendo
+    errors:
+      models:
+        doorkeeper/application:
+          attributes:
+            redirect_uri:
+              fragment_present: ne povas kontenar fragmento.
+              invalid_uri: mustas esar valida URI.
+              relative_uri: mustas esar absoluta URI.
+              secured_uri: mustas esar URI HTTPS/SSL.
+  doorkeeper:
+    applications:
+      buttons:
+        authorize: Yurizar
+        cancel: Nuhiligar
+        destroy: Destruktar
+        edit: Redaktar
+        submit: Sendar
+      confirmations:
+        destroy: Ka tu esas certa?
+      edit:
+        title: Redaktar apliko
+      form:
+        error: Ups! Kontrolez tua formulario kad esas erori
+      help:
+        native_redirect_uri: Uzez %{native_redirect_uri} por lokala probi
+        redirect_uri: Uzez un lineo por singla URI
+      index:
+        new: New Application
+      new:
+        title: New Application
+      show:
+        application_id: Application Id
+        callback_urls: Callback urls
+        secret: Secret
+    scopes:
+      follow: follow, block, unblock and unfollow accounts
+      read: read your account's data
+      write: post on your behalf
