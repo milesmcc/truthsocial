@@ -1,2 +1,0 @@
-Fabricator(:conversation) do
-end
