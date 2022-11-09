@@ -1,0 +1,17 @@
+---
+sk:
+  activerecord:
+    attributes:
+      poll:
+        expires_at: Trvá do
+        options: Voľby
+    errors:
+      models:
+        account:
+          attributes:
+            username:
+              invalid: iba písmená, číslice a podčiarkovníky
+        status:
+          attributes:
+            reblog:
+              taken: príspevku už existuje

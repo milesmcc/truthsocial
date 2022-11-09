@@ -1,0 +1,20 @@
+- content_for :page_title do
+  = t('settings.export')
+
+.table-wrapper
+  %table.table
+    %tbody
+      %tr
+        %th= t('exports.user_invites')
+        %td= number_with_delimiter @export.total_user_invites
+        - if @export.invites_csv_record
+          - if @export.invites_csv_record&.file_url == '' || @export.invites_csv_record&.status == 'PROCESSING'
+            %td
+              Generating csv for user invites
+              %i.fa.fa-spinner.fa-spin
+            %td= table_link_to 'download', 'Re-generate', settings_exports_user_invites_path(format: :csv)
+          - else
+            %td= table_link_to 'download', 'Generate', settings_exports_user_invites_path(format: :csv)
+            %td= table_link_to 'download', 'Download', @export.invites_csv_record&.file_url
+        - else
+          %td= table_link_to 'download', 'Generate', settings_exports_user_invites_path(format: :csv)
