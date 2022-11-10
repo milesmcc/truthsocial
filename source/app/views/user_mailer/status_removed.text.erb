@@ -1,0 +1,13 @@
+<%= t "user_mailer.status_removed.title" %>
+
+===
+
+<%= t "user_mailer.status_removed.explanation" %>
+
+<% @statuses.each do |status| %>
+
+<%= render 'notification_mailer/status', status: status %>
+---
+<% end %>
+
+<%= t 'user_mailer.warning.get_in_touch' %>
