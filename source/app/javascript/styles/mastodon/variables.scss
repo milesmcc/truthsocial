@@ -1,0 +1,93 @@
+// Truth Colors
+$color-1: #c62828;
+$color-1-dark: #8e0000;
+$color-1-light: #ff5f52;
+$color-2: #e53935;
+$color-2-dark: #ab000d;
+$color-2-light: #ff6f60;
+$color-3: #1a237e;
+$color-3-dark: #000051;
+$color-3-light: #534bae;
+$color-4: #3949ab;
+$color-4-dark: #00227b;
+$color-4-light: #6f74dd;
+$color-5: #37474f;
+$color-5-dark: #102027;
+$color-5-light: #62727b;
+$color-6: #f5f5f5;
+$color-6-dark: #c2c2c2;
+$color-6-light: #fff;
+$color-7: #00e676;
+$color-7-dark: #00b248;
+$color-7-light: #66ffa6;
+$color-8: #ffea00;
+$color-8-dark: #c7b800;
+$color-8-light: #ffff56;
+$color-9: #ffab00;
+$color-9-dark: #c67c00;
+$color-9-light: #ffdd4b;
+
+// Commonly used web colors
+$black: #000000; // Black
+$white: #ffffff; // White
+$offwhite: #f5f5f5; // White
+$success-green: #79bd9a !default; // Padua
+$error-red: #df405a !default; // Cerise
+$warning-red: #ff5050 !default; // Sunset Orange
+$gold-star: #ca8f04 !default; // Dark Goldenrod
+
+$red-bookmark: $warning-red;
+
+// Values from the classic Mastodon UI
+$classic-base-color: #282c37; // Midnight Express
+$classic-primary-color: #9baec8; // Echo Blue
+$classic-secondary-color: #d9e1e8; // Pattens Blue
+$classic-highlight-color: #2b90d9; // Summer Sky
+$classic-tertiary-color: #0f206c;
+
+// Variables for defaults in UI
+$base-shadow-color: $black !default;
+$base-overlay-background: $black !default;
+$base-border-color: $white !default;
+$simple-background-color: $white !default;
+$valid-value-color: $success-green !default;
+$error-value-color: $error-red !default;
+
+// Tell UI to use selected colors
+$ui-base-color: $classic-base-color !default; // Darkest
+$ui-base-lighter-color: lighten(
+  $ui-base-color,
+  26%
+) !default; // Lighter darkest
+$ui-primary-color: $classic-primary-color !default; // Lighter
+$ui-secondary-color: $classic-secondary-color !default; // Lightest
+$ui-highlight-color: $classic-highlight-color !default;
+$ui-tertiary-color: $classic-tertiary-color;
+
+// Variables for texts
+$primary-text-color: $white !default;
+$darker-text-color: $ui-primary-color !default;
+$dark-text-color: $ui-base-lighter-color !default;
+$secondary-text-color: $ui-secondary-color !default;
+$highlight-text-color: $ui-highlight-color !default;
+$action-button-color: $ui-base-lighter-color !default;
+$passive-text-color: $gold-star !default;
+$active-passive-text-color: $success-green !default;
+// For texts on inverted backgrounds
+$inverted-text-color: $ui-base-color !default;
+$lighter-text-color: $ui-base-lighter-color !default;
+$light-text-color: $ui-primary-color !default;
+
+// Language codes that uses CJK fonts
+$cjk-langs: ja, ko, zh-CN, zh-HK, zh-TW;
+
+// Variables for components
+$media-modal-media-max-width: 100%;
+// put margins on top and bottom of image to avoid the screen covered by image.
+$media-modal-media-max-height: 80%;
+
+$no-gap-breakpoint: 415px;
+
+$font-sans-serif: "mastodon-font-sans-serif" !default;
+$font-display: "mastodon-font-display" !default;
+$font-monospace: "mastodon-font-monospace" !default;
