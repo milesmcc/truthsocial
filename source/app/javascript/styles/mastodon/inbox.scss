@@ -1,0 +1,29 @@
+.verified-account-status, .comment {
+  display: inline-block;
+  width: 24px;
+}
+
+.mr-2 {
+  margin-right: 2px;
+}
+
+.attach-image-item {
+  max-width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.attachment-list.compact {
+  .attachment-list__list {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+
+    li {
+      margin-right: 4px;
+    }
+  }
+}

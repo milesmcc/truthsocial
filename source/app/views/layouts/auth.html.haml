@@ -1,0 +1,15 @@
+- content_for :header_tags do
+  = javascript_pack_tag 'public', crossorigin: 'anonymous'
+
+- content_for :content do
+  .container-alt
+    .form-container
+      .logo-container
+        %h1
+          = link_to root_path do
+            = svg_logo_full
+      = render 'flashes'
+
+      = yield
+
+= render template: 'layouts/application'

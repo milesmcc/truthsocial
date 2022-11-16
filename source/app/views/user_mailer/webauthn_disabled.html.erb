@@ -1,0 +1,59 @@
+<table class="w-full" cellpadding="0" cellspacing="0" border="0" role="presentation">
+  <tr>
+    <td
+      class="relative h-200 -top-36 text-center"
+      style="background: url(<%= full_pack_url('media/images/mailer/circles.png') %>) no-repeat center center / cover;"
+    >
+      <%= image_tag(
+        full_pack_url('media/images/mailer/icons/webauthn-credential-deleted.png'),
+        alt: t('devise.mailer.webauthn_disabled.title'),
+        class: "h-80 w-80 absolute left-1/2 top-1/2 -mt-40 -ml-40") %>
+
+      <table class="w-full" cellpadding="0" cellspacing="0" border="0" role="presentation">
+        <tr>
+          <td class="relative top-72">
+            <h1 class="text-xl text-center">
+              <%= t('devise.mailer.webauthn_disabled.title') %>
+            </h1>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table class="w-full" cellpadding="0" cellspacing="0" border="0" role="presentation">
+  <tr>
+    <td class="relative">
+      <table class="w-full" cellpadding="0" cellspacing="0" border="0" role="presentation">
+        <tr>
+          <td class="relative">
+            <p class="text-gray-600 mb-4">
+              <%= t 'devise.mailer.webauthn_disabled.explanation' %>
+            </p>
+
+            <table class="w-full" role="separator" cellpadding="0" cellspacing="0">
+              <tr>
+                <td class="leading-24">&zwnj;</td>
+              </tr>
+            </table>
+
+            <table cellpadding="0" cellspacing="0" border="0" role="presentation">
+              <tr>
+                <td class="leading-full">
+                  <a href="<%= edit_user_registration_url %>" class="relative inline-block py-16 px-24 rounded-full text-base font-medium text-center no-underline text-white bg-primary-600 hover:bg-primary-700">
+                    <!--[if mso]><i style="letter-spacing: 24px; mso-font-width: -100%; mso-text-raise:30px;">&#8202;</i><![endif]-->
+                    <span style="mso-text-raise: 16px;">
+                      <%= t('settings.account_settings') %>
+                      &rarr;</span>
+                    <!--[if mso]><i style="letter-spacing: 24px; mso-font-width: -100%;">&#8202;</i><![endif]-->
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
