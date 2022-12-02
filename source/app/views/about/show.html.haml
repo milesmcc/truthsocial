@@ -1,0 +1,21 @@
+- content_for :page_title do
+  = site_hostname
+
+- content_for :header_tags do
+  %link{ rel: 'canonical', href: about_url }/
+  = render partial: 'shared/og'
+
+.landing
+  .landing__brand
+    = link_to root_url, class: 'brand' do
+      = svg_logo_full
+
+  .landing__grid
+    .landing__grid__column.landing__grid__column-registration
+      .box-widget
+        = render 'registration'
+
+
+    .landing__grid__column.landing__grid__column-login
+      .box-widget
+        = render 'login'
