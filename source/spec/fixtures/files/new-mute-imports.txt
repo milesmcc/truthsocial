@@ -1,4 +1,0 @@
-Account address,Hide notifications
-bob,true
-eve@example.com,false
-
