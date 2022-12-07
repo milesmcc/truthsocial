@@ -1,0 +1,49 @@
+<table class="w-full mb-4" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td>
+      <table class="w-full mb-4" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="w-56">
+            <%= image_tag full_asset_url(status.account.avatar.url), alt:'', class: "w-48 rounded-full" %>
+          </td>
+          <td>
+            <p class="text-gray-800 my-0"><%= display_name(status.account) %></p>
+            <p class="text-gray-600 my-0">@<%= status.account.acct %></p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="w-full" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td>
+            <% if status.spoiler_text? %>
+              <p class="text-gray-600 my-0">
+                <%= Formatter.instance.format_spoiler(status) %>
+              </p>
+            <% end %>
+
+            <p class="text-gray-800 my-0">
+              <%= Formatter.instance.format(status) %>
+            </p>
+
+            <% if status.media_attachments.size > 0 %>
+              <p class="my-0">
+                <% status.media_attachments.each do |a| %>
+                  <% if status.local? %>
+                    <%= link_to medium_url(a), medium_url(a), class: "text-primary-600" %>
+                  <% else %>
+                    <%= link_to a.remote_url, a.remote_url, class: "text-primary-600" %>
+                  <% end %>
+                <% end %>
+              </p>
+            <% end %>
+
+            <p class="my-0">
+              <%= link_to l(status.created_at), web_url("statuses/#{status.id}"), class: "text-primary-600" %>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
