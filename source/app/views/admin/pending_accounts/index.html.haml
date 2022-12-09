@@ -1,0 +1,22 @@
+- content_for :page_title do
+  = t('admin.pending_accounts.title', count: User.pending.count)
+
+- content_for :header_tags do
+  = javascript_pack_tag 'admin', async: true, crossorigin: 'anonymous'
+
+= form_for(@form, url: batch_admin_pending_accounts_path) do |f|
+  = hidden_field_tag :page, params[:page] || 1
+
+  .batch-table
+    .batch-table__toolbar
+      .batch-table__toolbar__actions
+        = f.button safe_join([fa_icon('check'), t('admin.accounts.approve')]), name: :approve, class: 'table-action-link', type: :submit, data: { confirm: t('admin.reports.are_you_sure') }
+
+        = f.button safe_join([fa_icon('times'), t('admin.accounts.reject')]), name: :reject, class: 'table-action-link', type: :submit, data: { confirm: t('admin.reports.are_you_sure') }
+    .batch-table__body
+      - if @accounts.empty?
+        = nothing_here 'nothing-here--under-tabs'
+      - else
+        = render partial: 'account', collection: @accounts, locals: { f: f }
+
+= paginate @accounts

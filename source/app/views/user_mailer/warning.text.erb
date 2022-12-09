@@ -1,0 +1,29 @@
+<%= t "user_mailer.warning.title.#{@warning.action}" %>
+
+===
+
+<% unless @warning.none_action? %>
+  <% if @warning.action == "suspend" %>
+    <% if @duration == :indefinite %>
+      <%= t "user_mailer.warning.explanation.#{@warning.action}_indefinite_html", email: mail_to(Setting.site_contact_email, nil) %>
+    <% else %>
+      <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: mail_to(Setting.site_contact_email, nil), suspension_duration: ActiveSupport::Duration.build(@duration).inspect %>
+    <% end %>
+  <% else %>
+    <%= t "user_mailer.warning.explanation.#{@warning.action}_html", email: Setting.site_contact_email %>
+  <% end %>
+<% end %>
+<%= @warning.text %>
+<% if !@statuses.nil? && !@statuses.empty? %>
+<%= t('user_mailer.warning.statuses') %>
+
+<% @statuses.each do |status| %>
+
+<%= render 'notification_mailer/status', status: status %>
+---
+<% end %>
+<% else %>
+---
+<% end %>
+
+<%= t 'user_mailer.warning.get_in_touch' %>
