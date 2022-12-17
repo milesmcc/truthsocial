@@ -1,0 +1,9 @@
+<%= raw t('application_mailer.salutation', name: display_name(@me)) %>
+
+<%= raw t('notification_mailer.mention.body', name: @status.account.acct) %>
+
+<%= render 'status', status: @status %>
+
+If you no longer wish to receive transactional emails go here: 
+
+<%= @url_string %>

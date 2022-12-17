@@ -1,0 +1,12 @@
+---
+ast:
+  activerecord:
+    attributes:
+      poll:
+        options: Escoyetes
+    errors:
+      models:
+        account:
+          attributes:
+            username:
+              invalid: namái lletres, númberos y guiones baxos
