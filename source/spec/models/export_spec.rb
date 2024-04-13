@@ -68,6 +68,7 @@ describe Export do
   describe 'total_follows' do
     it 'returns the total number of the followed accounts' do
       target_accounts.each(&account.method(:follow!))
+      Procedure.process_account_following_statistics_queue
       expect(Export.new(account.reload).total_follows).to eq 2
     end
 

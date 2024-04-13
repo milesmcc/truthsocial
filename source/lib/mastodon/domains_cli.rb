@@ -40,7 +40,16 @@ module Mastodon
               end
 
       processed, = parallelize_with_progress(scope) do |account|
-        DeleteAccountService.new.call(account, reserve_username: false, skip_side_effects: true) unless options[:dry_run]
+        unless options[:dry_run]
+          DeleteAccountService.new.call(
+            account,
+            DeleteAccountService::DELETED_BY_SERVICE,
+            deletion_type: 'mastodon_cli_purge',
+            reserve_username: false,
+            skip_activitypub: true,
+            skip_side_effects: true,
+          )
+        end
       end
 
       DomainBlock.where(domain: domains).destroy_all unless options[:dry_run]

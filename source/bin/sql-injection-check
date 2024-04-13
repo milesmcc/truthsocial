@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "\033[0;36m Testing for SQL injection vulnerabilities...\033[0m"
+
+DIRS="./app/controllers/*.rb
+./app/helpers/*.rb
+./app/models/*.rb
+./app/serializers/*.rb
+./app/services/*.rb
+./app/workers/*.rb"
+
+if grep -b -r -e 'execute(\w\|execute(\s\+\w\|exec_query(\w\|exec_query(\s\+\w' $DIRS
+then
+  echo "\033[0;31m Potential SQL injection vulnerability! To prevent SQL injections that Brakeman can't catch, variables or function calls are not valid arguments to the execute() function."
+  exit 1
+fi

@@ -193,8 +193,8 @@ RSpec.describe Remotable do
         error_classes.each do |error_class|
           let(:error_class) { error_class }
 
-          it 'calls Rails.logger.debug' do
-            expect(Rails.logger).to receive(:debug).with(/^Error fetching remote #{hoge}: /)
+          it 'calls Rails.logger.info' do
+            expect(Rails.logger).to receive(:info).with(/^Error fetching remote #{hoge}: /)
             foo.hoge_remote_url = url
           end
         end

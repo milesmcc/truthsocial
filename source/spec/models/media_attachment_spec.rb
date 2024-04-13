@@ -82,8 +82,8 @@ RSpec.describe MediaAttachment, type: :model do
     end
 
     it 'sets meta' do
-      expect(media.file.meta["original"]["width"]).to eq 128
-      expect(media.file.meta["original"]["height"]).to eq 128
+      expect(media.file.meta['original']['width']).to eq 128
+      expect(media.file.meta['original']['height']).to eq 128
     end
   end
 
@@ -106,11 +106,31 @@ RSpec.describe MediaAttachment, type: :model do
         end
 
         it 'sets meta' do
-          expect(media.file.meta["original"]["width"]).to eq fixture[:width]
-          expect(media.file.meta["original"]["height"]).to eq fixture[:height]
-          expect(media.file.meta["original"]["aspect"]).to eq fixture[:aspect]
+          expect(media.file.meta['original']['width']).to eq fixture[:width]
+          expect(media.file.meta['original']['height']).to eq fixture[:height]
+          expect(media.file.meta['original']['aspect']).to eq fixture[:aspect]
         end
       end
+    end
+  end
+
+  describe 'mp3 with large cover art' do
+    let(:media) { described_class.create(account: Fabricate(:account), file: attachment_fixture('boop.mp3')) }
+
+    it 'detects it as an audio file' do
+      expect(media.type).to eq 'audio'
+    end
+
+    it 'sets meta for the duration' do
+      expect(media.file.meta['original']['duration']).to be_within(0.05).of(0.235102)
+    end
+
+    it 'extracts thumbnail' do
+      expect(media.thumbnail.present?).to be true
+    end
+
+    it 'gives the file a random name' do
+      expect(media.file_file_name).to_not eq 'boop.mp3'
     end
   end
 
@@ -118,12 +138,12 @@ RSpec.describe MediaAttachment, type: :model do
     let(:media) { MediaAttachment.create(account: Fabricate(:account), file: attachment_fixture('attachment.jpg')) }
 
     it 'sets meta for different style' do
-      expect(media.file.meta["original"]["width"]).to eq 600
-      expect(media.file.meta["original"]["height"]).to eq 400
-      expect(media.file.meta["original"]["aspect"]).to eq 1.5
-      expect(media.file.meta["small"]["width"]).to eq 600
-      expect(media.file.meta["small"]["height"]).to eq 400
-      expect(media.file.meta["small"]["aspect"]).to eq 1.5
+      expect(media.file.meta['original']['width']).to eq 600
+      expect(media.file.meta['original']['height']).to eq 400
+      expect(media.file.meta['original']['aspect']).to eq 1.5
+      expect(media.file.meta['small']['width']).to eq 600
+      expect(media.file.meta['small']['height']).to eq 400
+      expect(media.file.meta['small']['aspect']).to eq 1.5
     end
 
     it 'gives the file a random name' do
@@ -150,11 +170,67 @@ RSpec.describe MediaAttachment, type: :model do
     expect(media.valid?).to be false
   end
 
+  describe 'size limit validation' do
+    it 'rejects video files that are too large' do
+      stub_const 'MediaAttachment::IMAGE_LIMIT', 100.megabytes
+      stub_const 'MediaAttachment::VIDEO_LIMIT', 1.kilobyte
+      expect { described_class.create!(account: Fabricate(:account), file: attachment_fixture('attachment.webm')) }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it 'accepts video files that are small enough' do
+      stub_const 'MediaAttachment::IMAGE_LIMIT', 1.kilobyte
+      stub_const 'MediaAttachment::VIDEO_LIMIT', 100.megabytes
+      media = described_class.create!(account: Fabricate(:account), file: attachment_fixture('attachment.webm'))
+      expect(media.valid?).to be true
+    end
+
+    it 'rejects image files that are too large' do
+      stub_const 'MediaAttachment::IMAGE_LIMIT', 1.kilobyte
+      stub_const 'MediaAttachment::VIDEO_LIMIT', 100.megabytes
+      expect { described_class.create!(account: Fabricate(:account), file: attachment_fixture('attachment.jpg')) }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it 'accepts image files that are small enough' do
+      stub_const 'MediaAttachment::IMAGE_LIMIT', 100.megabytes
+      stub_const 'MediaAttachment::VIDEO_LIMIT', 1.kilobyte
+      media = described_class.create!(account: Fabricate(:account), file: attachment_fixture('attachment.jpg'))
+      expect(media.valid?).to be true
+    end
+  end
+
   describe 'descriptions for remote attachments' do
     it 'are cut off at 1500 characters' do
       media = Fabricate(:media_attachment, description: 'foo' * 1000, remote_url: 'http://example.com/blah.jpg')
 
       expect(media.description.size).to be <= 1_500
+    end
+  end
+
+  describe '#unattached' do
+    let!(:alice) { Fabricate(:account, username: 'alice') }
+    let!(:bob) { Fabricate(:account, username: 'bob') }
+    let!(:media_attachment) { Fabricate.create(:media_attachment, file: attachment_fixture('avatar.gif')) }
+    let!(:media_attachment2) { Fabricate.create(:media_attachment, file: attachment_fixture('attachment.jpg'), status: Fabricate.create(:status, account: alice)) }
+    let!(:media_attachment3) { Fabricate.create(:media_attachment, file: attachment_fixture('mini-static.gif')) }
+    let(:chat) { Chat.create!(owner_account_id: alice.id, members: [bob.id]) }
+    let(:message) { ChatMessage.create!(created_by_account_id: alice.id, chat_id: chat.chat_id, content: Faker::Lorem.characters(number: 15)) }
+
+    it 'returns attachments not associated with a status or a chat message' do
+      ActiveRecord::Base.connection.exec_query("insert into chats.message_media_attachments (message_id, media_attachment_id) values (#{message.id}, #{media_attachment3.id})")
+
+      unattached = MediaAttachment.unattached
+
+      expect(unattached.size).to eq 1
+      expect(unattached.first).to eq media_attachment
+    end
+  end
+
+  describe 'after_post_process' do
+    let(:media) { MediaAttachment.create(account: Fabricate(:account), file: attachment_fixture('attachment.jpg')) }
+
+    it 'publishes asset.created' do
+      expect(EventProvider::EventProvider).to receive(:new).with('asset.created', ::AssetCreatedEvent, anything).and_call_original.once
+      media
     end
   end
 end

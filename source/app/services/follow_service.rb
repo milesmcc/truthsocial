@@ -14,10 +14,11 @@ class FollowService < BaseService
   # @option [Boolean] :bypass_locked
   # @option [Boolean] :bypass_limit Allow following past the total follow number
   # @option [Boolean] :with_rate_limit
+  # @option [Boolean] :skip_notification Do not notify followed user
   def call(source_account, target_account, options = {})
     @source_account = source_account
     @target_account = target_account
-    @options        = { bypass_locked: false, bypass_limit: false, with_rate_limit: false }.merge(options)
+    @options        = { bypass_locked: false, bypass_limit: false, with_rate_limit: false, skip_notification: false }.merge(options)
 
     raise ActiveRecord::RecordNotFound if following_not_possible?
     raise Mastodon::NotPermittedError  if following_not_allowed?
@@ -79,12 +80,16 @@ class FollowService < BaseService
   def direct_follow!
     follow = @source_account.follow!(@target_account, reblogs: @options[:reblogs], notify: @options[:notify], rate_limit: @options[:with_rate_limit], bypass_limit: @options[:bypass_limit])
 
-    LocalNotificationWorker.perform_async(@target_account.id, follow.id, follow.class.name, :follow)
+    LocalNotificationWorker.perform_async(@target_account.id, follow.id, follow.class.name, :follow) unless @options[:skip_notification]
     MergeWorker.perform_async(@target_account.id, @source_account.id)
 
     redis.del("whale:following:#{@source_account.id}") if @target_account.whale?
 
     InvalidateSecondaryCacheService.new.call("InvalidateFollowCacheWorker", @source_account.id, @target_account.id, @target_account.whale?)
+
+    redis.del("avatars_carousel_list_#{@source_account.id}") if @source_account.following_count.to_i < 10
+
+    InvalidateSecondaryCacheService.new.call("InvalidateAvatarsCarouselCacheWorker", @source_account.id)
 
     follow
   end

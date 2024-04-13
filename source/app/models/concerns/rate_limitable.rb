@@ -14,7 +14,11 @@ module RateLimitable
   def rate_limiter(by, options = {})
     return @rate_limiter if defined?(@rate_limiter)
 
-    @rate_limiter = RateLimiter.new(by, options)
+    @rate_limiter = if by.is_a?(Account) && by.trust_level == Account::TRUST_LEVELS[:hostile]
+                      HostileRateLimiter.new(by, options)
+                    else
+                      RateLimiter.new(by, options)
+                    end
   end
 
   class_methods do

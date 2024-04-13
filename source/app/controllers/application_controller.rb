@@ -24,6 +24,7 @@ class ApplicationController < ActionController::Base
   rescue_from ActionController::UnknownFormat, with: :not_acceptable
   rescue_from ActionController::InvalidAuthenticityToken, with: :unprocessable_entity
   rescue_from Mastodon::RateLimitExceededError, with: :too_many_requests
+  rescue_from Mastodon::UnprocessableEntityError, with: :unprocessable_with_message
 
   rescue_from HTTP::Error, OpenSSL::SSL::SSLError, with: :internal_server_error
   rescue_from Mastodon::RaceConditionError, Seahorse::Client::NetworkingError, Stoplight::Error::RedLight, ActiveRecord::SerializationFailure, with: :service_unavailable
@@ -99,6 +100,10 @@ class ApplicationController < ActionController::Base
     respond_with_error(422)
   end
 
+  def unprocessable_with_message(error_message)
+    render json: { error: error_message.to_s }, status: 422
+  end
+
   def not_acceptable
     respond_with_error(406)
   end
@@ -144,10 +149,21 @@ class ApplicationController < ActionController::Base
     'mastodon-light'
   end
 
-  def respond_with_error(code)
+  def respond_with_error(status)
+    code = Rack::Utils::HTTP_STATUS_CODES[status]
     respond_to do |format|
-      format.any  { render "errors/#{code}", layout: 'error', status: code, formats: [:html] }
-      format.json { render json: { error: Rack::Utils::HTTP_STATUS_CODES[code] }, status: code }
+      format.json do
+        render json: {
+          error: code,
+          error_message: code,
+          error_code: format_code(code),
+        }, status: status
+      end
+      format.any { render "errors/#{status}", layout: 'error', status: status, formats: [:html] }
     end
+  end
+
+  def format_code(string)
+    string.upcase.gsub(' ', '_')
   end
 end

@@ -8,7 +8,7 @@ class ActivityPub::ProcessPollService < BaseService
 
     return unless expected_type?
 
-    previous_expires_at = poll.expires_at
+    #previous_expires_at = poll.expires_at
 
     expires_at = if @json['closed'].is_a?(String)
                    @json['closed']
@@ -47,9 +47,9 @@ class ActivityPub::ProcessPollService < BaseService
 
     # If the poll had no expiration date set but now has, and people have voted,
     # schedule a notification.
-    if previous_expires_at.nil? && poll.expires_at.present? && poll.votes.exists?
-      PollExpirationNotifyWorker.perform_at(poll.expires_at + 5.minutes, poll.id)
-    end
+    # if previous_expires_at.nil? && poll.expires_at.present? && poll.votes.exists?
+    #   PollExpirationNotifyWorker.perform_at(poll.expires_at + 5.minutes, poll.id)
+    # end
   end
 
   private

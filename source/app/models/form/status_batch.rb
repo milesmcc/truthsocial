@@ -34,8 +34,9 @@ class Form::StatusBatch
 
   def delete_statuses
     Status.where(id: status_ids).reorder(nil).find_each do |status|
+      status.reblogs.update_all(deleted_at: Time.current, deleted_by_id: current_account.id)
       status.update!(deleted_at: Time.current, deleted_by_id: current_account.id)
-      RemovalWorker.perform_async(status.id, immediate: true)
+      RemovalWorker.perform_async(status.id, immediate: false)
       Tombstone.find_or_create_by(uri: status.uri, account: status.account, by_moderator: true)
       log_action :destroy, status
     end

@@ -5,7 +5,7 @@ RSpec.describe Api::V1::ConversationsController, type: :controller do
 
   let!(:user) { Fabricate(:user, account: Fabricate(:account, username: 'alice')) }
   let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: scopes) }
-  let(:other) { Fabricate(:user, account: Fabricate(:account, username: 'bob')) }
+  let(:other) { Fabricate(:user, account: Fabricate(:account, username: 'bob', created_at: Time.now - 10.days)) }
 
   before do
     acct = Fabricate(:account, username: "ModerationAI")
@@ -18,7 +18,8 @@ RSpec.describe Api::V1::ConversationsController, type: :controller do
     let(:scopes) { 'read:statuses' }
 
     before do
-      PostStatusService.new.call(other.account, text: 'Hey @alice', visibility: 'direct', mentions: ['alice'])
+      status = PostStatusService.new.call(other.account, text: 'Hey @alice', visibility: 'direct', mentions: ['alice'])
+      ProcessMentionsService.create_notification(status, status.mentions.first)
     end
 
     it 'returns http success' do

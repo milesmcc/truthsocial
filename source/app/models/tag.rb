@@ -8,7 +8,7 @@
 #  created_at          :datetime         not null
 #  updated_at          :datetime         not null
 #  usable              :boolean
-#  trendable           :boolean
+#  trendable           :boolean          default(TRUE), not null
 #  listable            :boolean
 #  reviewed_at         :datetime
 #  requested_review_at :datetime
@@ -18,6 +18,9 @@
 #
 
 class Tag < ApplicationRecord
+  extend Queriable
+  include Paginable
+
   has_and_belongs_to_many :statuses
   has_and_belongs_to_many :accounts
 
@@ -30,16 +33,20 @@ class Tag < ApplicationRecord
   validates :name, presence: true, format: { with: /\A(#{HASHTAG_NAME_RE})\z/i }
   validate :validate_name_change, if: -> { !new_record? && name_changed? }
 
+  before_create :unlist_bannable_tags
+
   scope :reviewed, -> { where.not(reviewed_at: nil) }
   scope :unreviewed, -> { where(reviewed_at: nil) }
   scope :pending_review, -> { unreviewed.where.not(requested_review_at: nil) }
   scope :usable, -> { where(usable: [true, nil]) }
   scope :listable, -> { where(listable: [true, nil]) }
-  scope :trendable, -> { where(trendable: true).order(last_status_at: :desc) }
+  scope :trendable, -> { where(trendable: true).where.not(max_score: nil).order(max_score: :desc, last_status_at: :desc) }
+  scope :only_trendable, -> { where(trendable: true).order(max_score: :desc, last_status_at: :desc) }
   scope :recently_used, ->(account) { joins(:statuses).where(statuses: { id: account.statuses.select(:id).limit(1000) }).group(:id).order(Arel.sql('count(*) desc')) }
   scope :matches_name, ->(term) { where(arel_table[:name].lower.matches("#{sanitize_sql_like(Tag.normalize(term.downcase))}%", nil, true)) } # Search with case-sensitive to use B-tree index
+  scope :search, ->(query) { where('LOWER(tags.name) LIKE :search', search: "%#{sanitize_sql_like(query&.downcase)}%") }
 
-  update_index 'tags#tag', :self
+  update_index 'tags', :self
 
   def contains_prohibited_terms?
     name_downcase = name.downcase
@@ -91,7 +98,7 @@ class Tag < ApplicationRecord
   def history
     days = []
 
-    7.times do |i|
+    1.upto(6) do |i|
       day = i.days.ago.beginning_of_day.to_i
 
       days << {
@@ -115,15 +122,9 @@ class Tag < ApplicationRecord
       end
     end
 
-    def search_for(term, limit = 5, offset = 0, options = {})
-      stripped_term = term.strip
-
-      query = Tag.listable.matches_name(stripped_term)
-      query = query.merge(matching_name(stripped_term).or(where.not(reviewed_at: nil))) if options[:exclude_unreviewed]
-
-      query.order(Arel.sql('length(name) ASC, name ASC'))
-           .limit(limit)
-           .offset(offset)
+    # options = [in_search_query text, in_limit smallint, in_offset integer]
+    def search_for(*options)
+      execute_query('select mastodon_api.search_tags ($1, $2, $3)', options).to_a.first['search_tags']
     end
 
     def find_normalized(name)
@@ -150,6 +151,17 @@ class Tag < ApplicationRecord
   end
 
   private
+
+  def unlist_bannable_tags
+    banned_words = BannedWord.pluck(:word)
+    regexp = Regexp.new(banned_words.join('|'), true)
+    bannable = regexp === name
+
+    if bannable
+      self.listable = false
+      self.trendable = false
+    end
+  end
 
   def validate_name_change
     errors.add(:name, I18n.t('tags.does_not_match_previous_name')) unless name_was.mb_chars.casecmp(name.mb_chars).zero?

@@ -16,7 +16,7 @@
 
 class SessionActivation < ApplicationRecord
   belongs_to :user, inverse_of: :session_activations
-  belongs_to :access_token, class_name: 'Doorkeeper::AccessToken', dependent: :destroy, optional: true
+  belongs_to :access_token, class_name: 'OauthAccessToken', dependent: :destroy, optional: true
   belongs_to :web_push_subscription, class_name: 'Web::PushSubscription', dependent: :destroy, optional: true
 
   delegate :token,
@@ -70,7 +70,7 @@ class SessionActivation < ApplicationRecord
   end
 
   def assign_access_token
-    self.access_token = Doorkeeper::AccessToken.create!(access_token_attributes)
+    self.access_token = OauthAccessToken.create!(access_token_attributes)
   end
 
   def access_token_attributes

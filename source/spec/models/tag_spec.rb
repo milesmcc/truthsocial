@@ -19,6 +19,29 @@ RSpec.describe Tag, type: :model do
     end
   end
 
+  describe '#unlist_bannable_tags' do
+    it 'should set listable and trendable to false' do
+      word =  BannedWord.pluck(:word).sample
+      tag = Tag.create!(name: word)
+      expect(tag.listable).to eq false
+      expect(tag.trendable).to eq false
+    end
+
+    it 'should set listable and trendable to false if banned word is included in tag name' do
+      word =  BannedWord.pluck(:word).sample
+      tag = Tag.create!(name: "Test#{word}Test")
+      expect(tag.listable).to eq false
+      expect(tag.trendable).to eq false
+    end
+
+    it 'should not set listable and trendable to false if banned word is not included in tag name' do
+      word = 'Nothing_bad'
+      tag = Tag.create!(name: "Test#{word}Test")
+      expect(tag.listable).to be true
+      expect(tag.trendable).to eq true
+    end
+  end
+
   describe 'HASHTAG_RE' do
     subject { Tag::HASHTAG_RE }
 
@@ -136,30 +159,63 @@ RSpec.describe Tag, type: :model do
 
   describe '.search_for' do
     it 'finds tag records with matching names' do
-      tag = Fabricate(:tag, name: "match")
-      _miss_tag = Fabricate(:tag, name: "miss")
+      tag_name = "match"
+      Fabricate(:tag, name: tag_name)
+      Fabricate(:tag, name: "miss")
 
-      results = Tag.search_for("match")
+      serialized_result = Tag.search_for("match", 10, 0)
 
-      expect(results).to eq [tag]
+      result = JSON.parse(serialized_result).first
+      expect_to_be_a_tag result
+      expect(result['name']).to eq tag_name
     end
 
     it 'finds tag records in case insensitive' do
-      tag = Fabricate(:tag, name: "MATCH")
-      _miss_tag = Fabricate(:tag, name: "miss")
+      tag_name = "MATCH"
+      Fabricate(:tag, name: tag_name)
+      Fabricate(:tag, name: "miss")
 
-      results = Tag.search_for("match")
+      serialized_result = Tag.search_for("match", 10, 0)
 
-      expect(results).to eq [tag]
+      result = JSON.parse(serialized_result).first
+      expect_to_be_a_tag result
+      expect(result['name']).to eq tag_name
     end
 
     it 'finds the exact matching tag as the first item' do
       similar_tag = Fabricate(:tag, name: "matchlater", reviewed_at: Time.now.utc)
       tag = Fabricate(:tag, name: "match", reviewed_at: Time.now.utc)
 
-      results = Tag.search_for("match")
+      serialized_result = Tag.search_for("match", 10, 0)
 
-      expect(results).to eq [tag, similar_tag]
+      result1, result2 = JSON.parse(serialized_result)
+      expect_to_be_a_tag result1
+      expect_to_be_a_tag result2
+      expect(result1['name']).to eq tag.name
+      expect(result2['name']).to eq similar_tag.name
+    end
+  end
+
+  describe '.history' do
+    it 'should return the tag history from 1 to 6 days ago' do
+      tag = Fabricate(:tag, name: 'Tag')
+      account = Fabricate(:account)
+      key = "activity:tags:#{tag.id}:#{1.day.ago.beginning_of_day.to_i}"
+      accounts_key = "activity:tags:#{tag.id}:#{1.day.ago.beginning_of_day.to_i}:accounts"
+      Redis.current.incrby(key, 1)
+      Redis.current.pfadd(accounts_key, account.id)
+
+      response = tag.history
+      first_response = response.first
+      last_response = response.last
+
+      expect(response.length).to eq(6)
+      expect(first_response[:day].to_i).to eq(1.day.ago.beginning_of_day.to_i)
+      expect(first_response[:uses].to_i).to eq(1)
+      expect(first_response[:accounts].to_i).to eq(1)
+      expect(last_response[:day].to_i).to eq(6.days.ago.beginning_of_day.to_i)
+      expect(last_response[:uses].to_i).to eq(0)
+      expect(last_response[:accounts].to_i).to eq(0)
     end
   end
 end

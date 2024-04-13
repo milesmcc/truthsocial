@@ -33,6 +33,9 @@ require_relative '../lib/rails/engine_extensions'
 require_relative '../lib/active_record/database_tasks_extensions'
 require_relative '../lib/active_record/batches'
 require_relative '../lib/s3/seahorse_extensions'
+require_relative '../lib/sidekiq_unique_jobs/manager_extensions'
+require_relative '../lib/http/request_extensions'
+
 require 'prometheus_exporter/client'
 
 Dotenv::Railtie.load
@@ -155,10 +158,12 @@ module Mastodon
       Doorkeeper::AuthorizationsController.layout 'modal'
       Doorkeeper::AuthorizedApplicationsController.layout 'admin'
       Doorkeeper::Application.send :include, ApplicationExtension
-      Doorkeeper::AccessToken.send :include, AccessTokenExtension
+      OauthAccessToken.send :include, AccessTokenExtension
       Devise::FailureApp.send :include, AbstractController::Callbacks
       Devise::FailureApp.send :include, HttpAcceptLanguage::EasyAccess
       Devise::FailureApp.send :include, Localized
     end
+
+    config.active_record.schema_format = :sql
   end
 end

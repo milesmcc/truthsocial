@@ -153,11 +153,11 @@ class FeedManager
   # @param [Account] into_account
   # @return [void]
   def unmerge_from_home(from_account, into_account)
-    timeline_key      = key(:home, into_account.id)
-    oldest_home_score = redis_timelines.zrange(timeline_key, 0, 0, with_scores: true)&.first&.last&.to_i || 0
+    timeline_key        = key(:home, into_account.id)
+    timeline_status_ids = redis.zrange(timeline_key, 0, -1)
 
-    from_account.statuses.select('id, reblog_of_id').where('id > ?', oldest_home_score).reorder(nil).find_each do |status|
-      remove_from_feed(:home, into_account.id, status, into_account.user&.aggregates_reblogs?)
+    from_account.statuses.select('id, reblog_of_id').where(id: timeline_status_ids).reorder(nil).find_each do |status|
+      remove_from_feed(:home, into_account.id, status, aggregate_reblogs: into_account.user&.aggregates_reblogs?)
     end
   end
 
@@ -166,11 +166,11 @@ class FeedManager
   # @param [List] list
   # @return [void]
   def unmerge_from_list(from_account, list)
-    timeline_key      = key(:list, list.id)
-    oldest_list_score = redis_timelines.zrange(timeline_key, 0, 0, with_scores: true)&.first&.last&.to_i || 0
+    timeline_key = key(:list, list.id)
+    timeline_status_ids = redis.zrange(timeline_key, 0, -1)
 
-    from_account.statuses.select('id, reblog_of_id').where('id > ?', oldest_list_score).reorder(nil).find_each do |status|
-      remove_from_feed(:list, list.id, status, list.account.user&.aggregates_reblogs?)
+    from_account.statuses.select('id, reblog_of_id').where(id: timeline_status_ids).reorder(nil).find_each do |status|
+      remove_from_feed(:list, list.id, status, aggregate_reblogs: list.account.user&.aggregates_reblogs?)
     end
   end
 
@@ -180,7 +180,7 @@ class FeedManager
   # @return [void]
   def clear_from_home(account, target_account)
     timeline_key        = key(:home, account.id)
-    timeline_status_ids = redis_timelines.zrange(timeline_key, 0, -1)
+    timeline_status_ids = status_ids_to_plain_numbers(redis_timelines.zrange(timeline_key, 0, -1))
     statuses            = Status.where(id: timeline_status_ids).select(:id, :reblog_of_id, :account_id).to_a
     reblogged_ids       = Status.where(id: statuses.map(&:reblog_of_id).compact, account: target_account).pluck(:id)
     with_mentions_ids   = Mention.active.where(status_id: statuses.flat_map { |s| [s.id, s.reblog_of_id] }.compact, account: target_account).pluck(:status_id)
@@ -200,7 +200,7 @@ class FeedManager
   # @return [void]
   def clear_from_list(list, target_account)
     timeline_key        = key(:list, list.id)
-    timeline_status_ids = redis_timelines.zrange(timeline_key, 0, -1)
+    timeline_status_ids = status_ids_to_plain_numbers(redis_timelines.zrange(timeline_key, 0, -1))
     statuses            = Status.where(id: timeline_status_ids).select(:id, :reblog_of_id, :account_id).to_a
     reblogged_ids       = Status.where(id: statuses.map(&:reblog_of_id).compact, account: target_account).pluck(:id)
     with_mentions_ids   = Mention.active.where(status_id: statuses.flat_map { |s| [s.id, s.reblog_of_id] }.compact, account: target_account).pluck(:status_id)
@@ -232,11 +232,11 @@ class FeedManager
     aggregate    = account.user&.aggregates_reblogs?
     timeline_key = key(:home, account.id)
 
-    account.statuses.limit(limit).each do |status|
+    account.statuses.where.not(visibility: :group).limit(limit).each do |status|
       add_to_feed(:home, account.id, status, aggregate)
     end
 
-    account.following.includes(:account_stat).find_each do |target_account|
+    account.following.includes(:account_follower, :account_following, :account_status).find_each do |target_account|
       if redis_timelines.zcard(timeline_key) >= limit
         oldest_home_score = redis_timelines.zrange(timeline_key, 0, 0, with_scores: true).first.last.to_i
         last_status_score = Mastodon::Snowflake.id_at(account.last_status_at)
@@ -282,7 +282,7 @@ class FeedManager
     # references to.
     redis_timelines.pipelined do
       reblogged_id_sets.each do |feed_id, future|
-        future.value.each do |reblogged_id|
+        status_ids_to_plain_numbers(future.value).each do |reblogged_id|
           reblog_set_key = key(type, feed_id, "reblogs:#{reblogged_id}")
           redis_timelines.del(reblog_set_key)
         end
@@ -310,6 +310,10 @@ class FeedManager
 
     redis.publish("timeline:whale:#{status.account_id}", Oj.dump(event: :delete, payload: status.id.to_s))
     true
+  end
+
+  def status_ids_to_plain_numbers(status_ids)
+    status_ids.map { |id| (id.is_a? Integer) || ((id.is_a? String) && id.force_encoding('UTF-8').valid_encoding? && (!id.include? '\\')) ? id : id.reverse.unpack('q').first }
   end
 
   private

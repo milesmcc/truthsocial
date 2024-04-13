@@ -49,6 +49,20 @@ class UserPolicy < ApplicationPolicy
     admin? && !record.admin? && demoteable?
   end
 
+  def enable_sms_reverification?
+    admin?
+  end
+
+  def disable_sms_reverification?
+    admin?
+  end
+
+
+  def enable_feature?
+    admin?
+  end
+
+
   private
 
   def promoteable?

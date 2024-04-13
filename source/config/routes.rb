@@ -5,6 +5,7 @@ require 'sidekiq-scheduler/web'
 
 Rails.application.routes.draw do
   root 'home#index'
+  resources :apidocs, only: [:index]
 
   mount LetterOpenerWeb::Engine, at: 'letter_opener' if Rails.env.development?
 
@@ -12,7 +13,6 @@ Rails.application.routes.draw do
 
   authenticate :user, lambda { |u| u.admin? } do
     mount Sidekiq::Web, at: 'sidekiq', as: :sidekiq
-    mount PgHero::Engine, at: 'pghero', as: :pghero
   end
 
   namespace :oauth do
@@ -27,17 +27,17 @@ Rails.application.routes.draw do
                 tokens: 'oauth/tokens'
   end
 
+  get '.well-known/host-meta', to: 'well_known/host_meta#show', as: :host_meta, defaults: { format: 'xml' }
+  get '.well-known/webfinger', to: 'well_known/webfinger#show', as: :webfinger
+  get '.well-known/change-password', to: redirect('/auth/edit')
+  post '.well-known/skadnetwork/report-attribution/', to: 'well_known/skadnetwork#create'
+
   get 'manifest', to: 'manifests#show', defaults: { format: 'json' }
   get 'intent', to: 'intents#show'
   get 'custom.css', to: 'custom_css#show', as: :custom_css
-
-  resource :instance_actor, path: 'actor', only: [:show] do
-    resource :inbox, only: [:create], module: :activitypub
-    resource :outbox, only: [:show], module: :activitypub
-  end
-
   get '/unsubscribe', to: 'unsubscribe#unsubscribe'
 
+  get '/link/:id', to: 'link#show', as: :link
   devise_scope :user do
     get '/invite/:invite_code', to: 'auth/registrations#new', as: :public_invite
 
@@ -50,16 +50,16 @@ Rails.application.routes.draw do
 
   devise_for :users, path: 'auth', controllers: {
     omniauth_callbacks: 'auth/omniauth_callbacks',
-    sessions:           'auth/sessions',
-    registrations:      'auth/registrations',
-    passwords:          'auth/passwords',
-    confirmations:      'auth/confirmations',
+    sessions: 'auth/sessions',
+    registrations: 'auth/registrations',
+    passwords: 'auth/passwords',
+    confirmations: 'auth/confirmations',
   }
 
   get '/users/:username', to: redirect('/@%{username}'), constraints: lambda { |req| req.format.nil? || req.format.html? }
 
   resources :accounts, path: 'users', only: [:show], param: :username do
-    get :remote_follow,  to: 'remote_follow#new'
+    get :remote_follow, to: 'remote_follow#new'
     post :remote_follow, to: 'remote_follow#create'
 
     resources :statuses, only: [:show] do
@@ -76,14 +76,10 @@ Rails.application.routes.draw do
     resource :follow, only: [:create], controller: :account_follow
     resource :unfollow, only: [:create], controller: :account_unfollow
 
-    resource :outbox, only: [:show], module: :activitypub
-    resource :inbox, only: [:create], module: :activitypub
     resource :claim, only: [:create], module: :activitypub
     resources :collections, only: [:show], module: :activitypub
     resource :followers_synchronization, only: [:show], module: :activitypub
   end
-
-  resource :inbox, only: [:create], module: :activitypub
 
   get '/@:username', to: 'accounts#show', as: :short_account
   get '/@:username/with_replies', to: 'accounts#show', as: :short_account_with_replies
@@ -92,7 +88,7 @@ Rails.application.routes.draw do
   get '/@:account_username/:id', to: 'statuses#show', as: :short_account_status
   get '/@:account_username/:id/embed', to: 'statuses#embed', as: :embed_short_account_status
 
-  get  '/interact/:id', to: 'remote_interaction#new', as: :remote_interaction
+  get '/interact/:id', to: 'remote_interaction#new', as: :remote_interaction
   post '/interact/:id', to: 'remote_interaction#create'
 
   get '/explore', to: 'directories#index', as: :explore
@@ -135,7 +131,6 @@ Rails.application.routes.draw do
     resources :webauthn_credentials, only: [:index, :new, :create, :destroy],
               path: 'security_keys',
               controller: 'two_factor_authentication/webauthn_credentials' do
-
       collection do
         get :options
       end
@@ -170,7 +165,7 @@ Rails.application.routes.draw do
     get :player
   end
 
-  resources :tags,   only: [:show]
+  resources :tags, only: [:show]
   resources :emojis, only: [:show]
   resources :invites, only: [:index, :create, :destroy]
   resources :filters, except: [:show, :index]
@@ -234,8 +229,6 @@ Rails.application.routes.draw do
 
       resources :reported_statuses, only: [:create]
     end
-
-    resources :trending_truths, only: [:index, :update, :destroy]
 
     resources :report_notes, only: [:create, :destroy]
 
@@ -331,6 +324,8 @@ Rails.application.routes.draw do
   end
 
   namespace :api do
+    get '/docs', to: 'docs#index'
+
     # OEmbed
     get '/oembed', to: 'oembed#show', as: :oembed
 
@@ -340,7 +335,7 @@ Rails.application.routes.draw do
       post :change_email, controller: 'user_settings'
       post :delete_account, controller: 'user_settings'
 
-      scope :accounts,  defaults: { format: 'json' } do
+      scope :accounts, defaults: { format: 'json' } do
         get :mfa, to: 'accounts#mfa'
         scope :mfa do
           scope :setup do
@@ -377,6 +372,10 @@ Rails.application.routes.draw do
           post :unpin, to: 'pins#destroy'
         end
 
+        collection do
+          resources :mutes, controller: 'statuses/mutes', only: :index
+        end
+
         member do
           get :context
           get 'context/ancestors', to: 'statuses#ancestors'
@@ -386,21 +385,35 @@ Rails.application.routes.draw do
 
       namespace :timelines do
         resource :home, only: :show, controller: :home
+        resource :following, only: :show, controller: :home
         # resource :public, only: :show, controller: :public
         resources :tag, only: :show
         resources :list, only: :show
+
+        resources :group, only: :show do
+          resources :tags, only: :show, path: 'tags', controller: 'group_tag'
+        end
       end
 
       namespace :truth do
         namespace :trending do
           resources :truths, only: :index
+          resources :groups, only: :index
+          resources :group_tags, only: :show
         end
 
         namespace :admin do
-          resources :accounts, only: [:index, :update]
-          scope :accounts do
-            get :count, to: 'accounts#count'
+          resources :accounts, only: [:index, :update] do
+            post 'mfa/confirm/totp', to: 'accounts#confirm_totp'
           end
+          scope :accounts do
+            get :blacklist, to: 'accounts#blacklist'
+            get :count, to: 'accounts#count'
+            get :email_domain_blocks, to: 'accounts#email_domain_blocks'
+          end
+          resources :email_domain_blocks, only: [:index, :create, :destroy]
+          resources :marketing_notifications, only: [:create]
+          resources :media_attachments, only: [:destroy]
         end
 
         scope :password_reset do
@@ -410,6 +423,94 @@ Rails.application.routes.draw do
 
         scope :email do
           get :confirm, to: 'emails#email_confirm'
+        end
+
+        namespace :carousels do
+          resources :avatars, only: [:index] do
+            post :seen, on: :collection
+          end
+          resources :groups, only: [:index] do
+            post :seen, on: :collection
+          end
+          resources :suggestions, only: [:index]
+          get 'avatars/accounts/:account_id/statuses', to: '/api/v1/accounts/statuses#index'
+
+          get 'tv',  to: '/api/v1/tv/carousel#index'
+          post 'tv/seen', to: '/api/v1/tv/carousel#seen'
+        end
+
+        get '/ads', to: 'ads#index', as: :ads
+        get '/ads/impression', to: 'ads#impression', as: :ads_impression
+
+        namespace :ios_device_check do
+          resources :challenge, only: [:index]
+          resources :rate_limit, only: [:index]
+          resources :attest, only: [:create] do
+            post :baseline, on: :collection
+            post :by_key_id, on: :collection
+          end
+          resources :assert, only: [:create] do
+            post :resolve, on: :collection
+          end
+        end
+
+        namespace :android_device_check do
+          resources :challenge, only: [:create]
+        end
+
+        resources :chats, only: [:index, :create] do
+          scope module: :chats do
+            resources :messages, only: [:index, :create, :destroy]
+          end
+        end
+
+        namespace :policies do
+          get :pending
+          patch :accept, path: '/:policy_id/accept', to: 'policies/accept'
+        end
+
+        resources :oauth_tokens, only: [:index, :destroy]
+
+        namespace :suggestions do
+          resources :groups, only: [:index, :destroy]
+
+          namespace :follows do
+            post :create, path: ':account_id', to: 'suggestions/follows'
+          end
+
+          namespace :statuses do
+            post :create, path: ':account_id', to: 'suggestions/statuses'
+          end
+        end
+
+        resources(:videos, only: :show)
+      end
+
+      namespace :pleroma do
+        namespace :chats do
+          post :by_account_id, path: 'by-account-id/:account_id'
+          get :by_account_id, path: 'by-account-id/:account_id', to: '/api/v1/pleroma/chats#get_by_account_id'
+          get 'silences', to: 'silences#index'
+          get 'sync'
+          get 'events', to: 'events#index'
+          get 'search', to: 'search#index'
+          get 'search/messages', to: 'search#search_messages'
+          get 'search/previews', to: 'search#search_previews'
+        end
+
+        resources :chats, only: [:index, :destroy, :show, :update] do
+          post 'read', to: 'chats#mark_read'
+          post 'accept', to: 'chats#accept'
+
+          scope module: :chats do
+            get 'sync', to: 'messages#sync'
+            resources :messages, only: [:index, :destroy, :create, :show] do
+              resources :reactions, only: [:show, :create, :destroy], param: :emoji
+            end
+            post 'silences', to: 'silences#create'
+            delete 'silences', to: 'silences#destroy'
+            get 'silences', to: 'silences#show'
+          end
         end
       end
 
@@ -452,16 +553,16 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :media,        only: [:create, :update, :show]
-      resources :blocks,       only: [:index]
-      resources :mutes,        only: [:index]
-      resources :favourites,   only: [:index]
-      resources :bookmarks,    only: [:index]
-      resources :reports,      only: [:create]
-      resources :trends,       only: [:index]
-      resources :filters,      only: [:index, :create, :show, :update, :destroy]
+      resources :media, only: [:create, :update, :show]
+      resources :blocks, only: [:index]
+      resources :mutes, only: [:index]
+      resources :favourites, only: [:index]
+      resources :bookmarks, only: [:index]
+      resources :reports, only: [:create]
+      resources :trends, only: [:index]
+      resources :filters, only: [:index, :create, :show, :update, :destroy]
       resources :endorsements, only: [:index]
-      resources :markers,      only: [:index, :create]
+      resources :markers, only: [:index, :create]
 
       namespace :apps do
         get :verify_credentials, to: 'credentials#show'
@@ -534,6 +635,54 @@ Rails.application.routes.draw do
         resource :accounts, only: [:show, :create, :destroy], controller: 'lists/accounts'
       end
 
+      namespace :groups do
+        resources :relationships, only: [:index]
+        resources :tags, only: [:index]
+      end
+
+      get '/groups/mutes', to: 'groups/mutes#index'
+
+      resources :groups, only: [:index, :create, :show, :update, :destroy] do
+        post :mute, to: 'groups/mutes#create'
+        post :unmute, to: 'groups/mutes#destroy'
+
+        resources :memberships, only: [:index], controller: 'groups/memberships'
+
+        resources :membership_requests, only: [:index], controller: 'groups/membership_requests' do
+          member do
+            post :authorize, to: 'groups/membership_requests#accept'
+            post :reject
+          end
+          post 'resolve', on: :collection
+        end
+
+        resources :statuses, only: [:destroy], controller: 'groups/statuses' do
+          resource :pin, only: :create, controller: 'groups/statuses/pins'
+          post :unpin, to: 'groups/statuses/pins#destroy'
+        end
+
+        resource :blocks, only: [:show, :create, :destroy], controller: 'groups/blocks'
+
+        resources :tags, only: :update, controller: 'groups/tags'
+
+        member do
+          post :join
+          post :leave
+          post :promote
+          post :demote
+        end
+
+        collection do
+          get :search
+          get :lookup
+          get :validate
+        end
+      end
+
+      resources :tags, only: [:show] do
+        resources :groups, only: :index, controller: 'tags/groups'
+      end
+
       namespace :featured_tags do
         get :suggestions, to: 'suggestions#index'
       end
@@ -548,20 +697,35 @@ Rails.application.routes.draw do
         resource :subscription, only: [:create, :show, :update, :destroy]
       end
 
+      namespace :tv do
+        resources :channels, only: :index
+        get 'accounts/:id/status', to: 'accounts#show'
+        get 'epg/:name', to: 'programme_guides#show'
+        get 'channels/:id/guide', to: 'guide#show'
+        put 'channels/:id/remind', to: 'program_reminder#update'
+        delete 'channels/:id/remind', to: 'program_reminder#destroy'
+      end
+
       get '/stats', to: 'admin#stats'
       namespace :admin do
         resources :statuses, only: [:index, :show] do
-          post :sensitize
           post :desensitize
-          post :undiscard
           post :discard
+          post :privatize
+          post :publicize
+          post :sensitize
+          post :undiscard
         end
 
         resources :accounts, only: [:index, :show, :create, :update, :destroy] do
           resources :follows, only: [:show], param: :target_account_id, controller: 'accounts/follows'
+          resources :statuses, only: [:index], controller: 'accounts/statuses'
+          resources :webauthn_credentials, only: [:index], controller: 'accounts/webauthn_credentials'
+
           collection do
             post :bulk_approve
           end
+
           member do
             post :enable
             post :unsensitive
@@ -577,6 +741,13 @@ Rails.application.routes.draw do
           resource :action, only: [:create], controller: 'account_actions'
         end
 
+        post '/accounts/bulk_action', to: 'bulk_account_actions#create'
+
+        resources :groups, only: [:index, :show, :update, :destroy] do
+          get :search, on: :collection
+          resources :statuses, only: [:index], controller: 'groups/statuses'
+        end
+
         resources :reports, only: [:index, :show] do
           member do
             resources :moderation_records, only: [:index]
@@ -587,7 +758,89 @@ Rails.application.routes.draw do
           end
         end
 
-        resources :trending_statuses, only: [:index, :update, :destroy]
+        resources :trending_statuses, only: :index do
+          member do
+            put :include
+            put :exclude
+          end
+
+          collection do
+            resources :settings, param: :name, controller: 'trending_statuses/settings', only: [:index, :update]
+          end
+
+          collection do
+            resources :expressions, controller: 'trending_statuses/expressions', only: [:index, :create, :update, :destroy]
+          end
+        end
+
+        resources :trending_tags, only: [:index, :update]
+
+        resources :trending_groups, only: :index do
+          member do
+            put :include
+            put :exclude
+          end
+
+          get :excluded, on: :collection
+        end
+
+        resources :chat_messages, only: [:show, :destroy]
+
+        resources :policies, only: [:index, :create, :destroy]
+
+        namespace :truth do
+          resources :interactive_ads, only: :create
+          namespace :suggestions do
+            resources :groups, only: [:index, :show, :create, :destroy]
+          end
+
+          namespace :android_device_check do
+            resources :integrity, only: [:create]
+          end
+
+          namespace :ios_device_check do
+            resources :attest, only: [:create]
+          end
+        end
+
+        namespace :tv do
+          resources :sessions, only: :index
+        end
+
+        resources :tags, only: [:index, :update]
+        resources :registrations, only: [:create]
+        resources :links, only: [:update]
+      end
+
+      resources :feeds, only: [
+        :index,
+        # :create,
+        :show,
+        :update,
+        # :destroy
+      ] do
+        member do
+          post 'accounts/:account_id', to: 'feeds#add_account'
+          delete 'accounts/:account_id', to: 'feeds#remove_account'
+          patch :seen, to: 'feeds#seen'
+        end
+      end
+
+      namespace :recommendations do
+        namespace :accounts do
+          resources :suppressions, only: [:create, :destroy]
+        end
+        namespace :groups do
+          resources :suppressions, only: [:create, :destroy]
+        end
+      end
+
+      namespace :verify_sms do
+        resources :countries, only: :index
+      end
+
+      namespace :push_notifications do
+        post '/:mark_id/mark', to: 'analytics#mark', as: :analytics_mark
       end
     end
 
@@ -595,6 +848,27 @@ Rails.application.routes.draw do
       resources :media, only: [:create]
       get '/search', to: 'search#index', as: :search
       resources :suggestions, only: [:index, :destroy]
+
+      namespace :pleroma do
+        namespace :chats do
+          get 'events', to: 'events#index'
+        end
+      end
+
+      resources :statuses, only: [:show] do
+        member do
+          get 'context/ancestors', to: 'statuses#ancestors', as: 'ancestors'
+          get 'context/descendants', to: 'statuses#descendants', as: 'descendants'
+        end
+      end
+
+      resources :feeds, only: [:index]
+    end
+
+    namespace :v4 do
+      namespace :truth do
+        get '/ads', to: 'ads#index'
+      end
     end
 
     namespace :web do
@@ -606,13 +880,35 @@ Rails.application.routes.draw do
         end
       end
     end
+
+    namespace :mock do
+      get '/feeds', to: 'feeds#index'
+      post '/feeds', to: 'feeds#create'
+      get '/feeds/:id', to: 'feeds#show'
+      patch '/feeds/:id', to: 'feeds#update'
+      delete '/feeds/:id', to: 'feeds#destroy'
+      put '/feeds/sort', to: 'feeds#sort'
+      post '/feeds/:id/accounts/:account_id', to: 'feeds#add_account'
+      delete '/feeds/:id/accounts/:account_id', to: 'feeds#remove_account'
+      post '/feeds/groups/:group_id/unmute', to: 'feeds#unmute_group'
+      post '/feeds/groups/:group_id/mute', to: 'feeds#mute_group'
+    end
   end
+
+  get '/api/v2/pleroma/chats', to: 'api/v1/pleroma/chats#index'
+  get '/api/v1/truth/trends/groups', to: 'api/v1/truth/trending/groups#index'
+  get '/api/v1/truth/trends/groups/:id/tags', to: 'api/v1/truth/trending/group_tags#show', as: :truth_trends_groups
+
+  get '/api/oauth_tokens', to: 'api/v1/truth/oauth_tokens#index'
+  delete '/api/oauth_tokens/:id', to: 'api/v1/truth/oauth_tokens#destroy'
+
+  get '/api/v1/trends/statuses', to: 'api/v1/truth/trending/truths#index'
 
   get '/web/(*any)', to: 'home#index', as: :web
 
-  get '/about',        to: 'about#show'
-  get '/about/more',   to: 'about#more'
-  get '/terms',        to: 'about#terms'
+  get '/about', to: 'about#show'
+  get '/about/more', to: 'about#more'
+  get '/terms', to: 'about#terms'
 
   match '/', via: [:post, :put, :patch, :delete], to: 'application#raise_not_found', format: false
   match '*unmatched_route', via: :all, to: 'application#raise_not_found', format: false

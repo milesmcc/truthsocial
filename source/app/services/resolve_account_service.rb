@@ -140,7 +140,7 @@ class ResolveAccountService < BaseService
   end
 
   def queue_deletion!
-    AccountDeletionWorker.perform_async(@account.id, reserve_username: false, skip_activitypub: true)
+    AccountDeletionWorker.perform_async(@account.id, -99, reserve_username: false, skip_activitypub: true)
   end
 
   def lock_options

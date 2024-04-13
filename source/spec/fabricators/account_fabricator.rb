@@ -10,4 +10,5 @@ Fabricator(:account) do
   private_key         { private_key }
   suspended_at        { |attrs| attrs[:suspended] ? Time.now.utc : nil }
   silenced_at         { |attrs| attrs[:silenced] ? Time.now.utc : nil }
+  accepting_messages  { true }
 end

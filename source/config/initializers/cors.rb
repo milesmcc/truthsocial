@@ -25,7 +25,16 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
       headers: :any,
       methods: [:post, :put, :delete, :get, :patch, :options],
       credentials: false,
-      expose: ['Link', 'X-RateLimit-Reset', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-Request-Id']
+      expose: [
+        'Link',
+        'X-RateLimit-Reset',
+        'X-RateLimit-Limit',
+        'X-RateLimit-Remaining',
+        'X-Request-Id',
+        'X-Unread-Messages-Count',
+        'X-Total-Count',
+        'X-Truth-Ad-Indexes'
+      ]
     resource '/oauth/token',
       headers: :any,
       methods: [:post],

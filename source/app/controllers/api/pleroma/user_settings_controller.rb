@@ -1,15 +1,34 @@
 # frozen_string_literal: true
 class Api::Pleroma::UserSettingsController < Api::BaseController
+  before_action -> { doorkeeper_authorize! :write }
   before_action :require_user!
   before_action :validate_password
   before_action :validate_email, only: :change_email
   before_action :set_new_email, only: :change_email
+  around_action :set_locale, only: :change_password
 
   def change_password
     if current_user.reset_password(resource_params[:new_password], resource_params[:new_password_confirmation])
+      OauthAccessToken.where.not(token: doorkeeper_token.token).where(resource_owner_id: current_user.id).update_all(revoked_at: Time.now.utc)
+
       render json: { status: :success }
     else
-      render json: { error: 'Password and password confirmation do not match.' }, status: 400
+      errors = current_user.errors.to_hash
+      password_invalid = errors[:password]&.pop
+      default_error = I18n.t('users.password_mismatch', locale: :en)
+      message, message_with_locale, code =
+        if password_invalid.present?
+          error = errors[:base]&.pop || default_error
+          [error, password_invalid, 'PASSWORD_INVALID']
+        else
+          [default_error, I18n.t('users.password_mismatch'), 'PASSWORD_MISMATCH']
+        end
+
+      render json: {
+        error: message,
+        error_code: code,
+        error_message: message_with_locale,
+      }, status: 400
     end
   end
 
@@ -40,7 +59,13 @@ class Api::Pleroma::UserSettingsController < Api::BaseController
 
   def destroy_account!
     current_account.suspend!(origin: :local)
-    AccountDeletionWorker.perform_async(current_user.account_id)
+    account_id = current_user.account_id
+    AccountDeletionWorker.perform_async(
+      account_id,
+      account_id,
+      deletion_type: 'self_deletion',
+      skip_activitypub: true,
+    )
     sign_out
   end
 

@@ -11,7 +11,7 @@ class Auth::PasswordsController < Devise::PasswordsController
       if resource.errors.empty?
         resource.session_activations.destroy_all
         resource.forget_me!
-        Doorkeeper::AccessToken.where(resource_owner_id: resource.id).update_all(revoked_at: Time.now.utc)
+        OauthAccessToken.where(resource_owner_id: resource.id).update_all(revoked_at: Time.now.utc)
       end
     end
   end

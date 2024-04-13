@@ -5,6 +5,7 @@ class Oauth::MfaController < Doorkeeper::TokensController
 
   def challenge
     params[:grant_type] = "password"
+    request.params[:username] = false
     create
   end
 

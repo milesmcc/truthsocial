@@ -5,8 +5,8 @@ class LinkCrawlWorker
 
   sidekiq_options queue: 'pull', retry: 5
 
-  def perform(status_id, url = nil)
-    FetchLinkCardService.new.call(Status.find(status_id), url)
+  def perform(status_id, url = nil, domain = nil)
+    FetchLinkCardService.new.call(Status.find(status_id), url, domain)
   rescue ActiveRecord::RecordNotFound
     true
   end

@@ -49,36 +49,38 @@ class AccountRelationshipsPresenter
       account_note: {},
     }
 
-    @uncached_account_ids = []
+    @uncached_account_ids = @account_ids.uniq
 
-    @account_ids.each do |account_id|
-      maps_for_account = Rails.cache.read("relationship:#{@current_account_id}:#{account_id}")
-
-      if maps_for_account.is_a?(Hash)
-        @cached.deep_merge!(maps_for_account)
-      else
-        @uncached_account_ids << account_id
-      end
+    cache_ids = @account_ids.map { |account_id| relationship_cache_key(account_id) }
+    Rails.cache.read_multi(*cache_ids).each do |key, maps_for_account|
+      @cached.deep_merge!(maps_for_account)
+      @uncached_account_ids.delete(key.last)
     end
 
     @cached
   end
 
   def cache_uncached!
-    @uncached_account_ids.each do |account_id|
+    to_cache = @uncached_account_ids.to_h do |account_id|
       maps_for_account = {
-        following:       { account_id => following[account_id] },
-        followed_by:     { account_id => followed_by[account_id] },
-        blocking:        { account_id => blocking[account_id] },
-        blocked_by:      { account_id => blocked_by[account_id] },
-        muting:          { account_id => muting[account_id] },
-        requested:       { account_id => requested[account_id] },
+        following: { account_id => following[account_id] },
+        followed_by: { account_id => followed_by[account_id] },
+        blocking: { account_id => blocking[account_id] },
+        blocked_by: { account_id => blocked_by[account_id] },
+        muting: { account_id => muting[account_id] },
+        requested: { account_id => requested[account_id] },
         domain_blocking: { account_id => domain_blocking[account_id] },
-        endorsed:        { account_id => endorsed[account_id] },
-        account_note:    { account_id => account_note[account_id] },
+        endorsed: { account_id => endorsed[account_id] },
+        account_note: { account_id => account_note[account_id] },
       }
 
-      Rails.cache.write("relationship:#{@current_account_id}:#{account_id}", maps_for_account, expires_in: 1.day)
+      [relationship_cache_key(account_id), maps_for_account]
     end
+
+    Rails.cache.write_multi(to_cache, expires_in: 1.day)
+  end
+
+  def relationship_cache_key(account_id)
+    ['relationship', @current_account_id, account_id]
   end
 end

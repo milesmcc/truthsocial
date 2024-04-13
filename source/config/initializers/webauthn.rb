@@ -20,5 +20,22 @@ WebAuthn.configure do |config|
   # In this case the default would be "auth.example.com", but you can set it to
   # the suffix "example.com"
   #
-  # config.rp_id = "example.com"
+  config.rp_id = ENV.fetch('SERVER_RP_ID', "truth.social")
+  config.silent_authentication = true
+end
+
+module WebAuthn
+  module AttestationStatement
+    def self.from(format, statement)
+      new_format = format == "apple-appattest" ? "apple" : format
+
+      klass = FORMAT_TO_CLASS[new_format]
+
+      if klass
+        klass.new(statement)
+      else
+        raise(FormatNotSupportedError, "Unsupported attestation format '#{format}'")
+      end
+    end
+  end
 end

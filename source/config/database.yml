@@ -35,14 +35,22 @@ production:
     connections:
       - role: master
         blacklist_duration: 0
-        url: postgresql://<%= ENV['DB_USER'] || 'truth' %>:<%= ENV['DB_PASS'] || '' %>@<%= ENV['DB_HOST'] || 'localhost' %>:<%= ENV['DB_PORT'] || 5432 %>/<%= ENV['DB_NAME'] || 'truth_production' %>
+        host: <%= ENV['DB_HOST'] || 'localhost' %>
+        port: <%= ENV['DB_PORT'] || 5432 %>
+        database: <%= ENV['DB_NAME'] || 'truth_production' %>
+        username: <%= ENV['DB_USER'] || 'truth' %>
+        password: <%= ENV['DB_PASS'] || '' %>
       - role: slave
         blacklist_duration: 0
-        url: postgresql://<%= ENV['DB_USER'] || 'truth' %>:<%= ENV['DB_PASS'] || '' %>@<%= ENV['DB_HOST_REPLICA'] || 'localhost' %>:<%= ENV['DB_PORT_REPLICA'] || 5433 %>/<%= ENV['DB_NAME'] || 'truth_production' %>
+        host: <%= ENV['DB_HOST_REPLICA'] || 'localhost' %>
+        port: <%= ENV['DB_PORT_REPLICA'] || 5433 %>
+        database: <%= ENV['DB_NAME_REPLICA'] || 'truth_production_ro' %>
+        username: <%= ENV['DB_USER_REPLICA'] || 'truth' %>
+        password: <%= ENV['DB_PASS_REPLICA'] || '' %>
 <% else %>
+  host: <%= ENV['DB_HOST'] || 'localhost' %>
+  port: <%= ENV['DB_PORT'] || 5432 %>
   database: <%= ENV['DB_NAME'] || 'truth_production' %>
   username: <%= ENV['DB_USER'] || 'truth' %>
   password: <%= ENV['DB_PASS'] || '' %>
-  host: <%= ENV['DB_HOST'] || 'localhost' %>
-  port: <%= ENV['DB_PORT'] || 5432 %>
 <% end %>

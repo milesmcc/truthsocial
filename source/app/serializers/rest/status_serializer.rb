@@ -3,11 +3,12 @@
 class REST::StatusSerializer < ActiveModel::Serializer
   attributes :id, :created_at, :in_reply_to_id, :in_reply_to_account_id,
              :sensitive, :spoiler_text, :visibility, :language,
-             :uri, :url
+             :uri, :url, :sponsored, :tombstone, :tv
 
   attribute :replies_count
   attribute :reblogs_count
   attribute :favourites_count
+  attribute :group_timeline_visible
   attribute :favourited, if: :current_user?
   attribute :reblogged, if: :current_user?
   attribute :muted, if: :current_user?
@@ -18,17 +19,19 @@ class REST::StatusSerializer < ActiveModel::Serializer
   attribute :text, if: :source_requested?
 
   attribute :quote_id, if: -> { object.quote? }
+  attribute :metrics, if: -> { object.ad.present? }
+  attribute :preview_card, key: :card
+  attribute :media_attachments
 
   belongs_to :reblog, serializer: REST::StatusSerializer
   belongs_to :application, if: :show_application?
   belongs_to :account, serializer: REST::AccountSerializer
+  belongs_to :group, serializer: REST::GroupSerializer
 
-  has_many :media_attachments, serializer: REST::MediaAttachmentSerializer
   has_many :ordered_mentions, key: :mentions
   has_many :tags
   has_many :emojis, serializer: REST::CustomEmojiSerializer
 
-  has_one :preview_card, key: :card, serializer: REST::PreviewCardSerializer
   has_one :preloadable_poll, key: :poll, serializer: REST::PollSerializer
 
   def id
@@ -45,6 +48,20 @@ class REST::StatusSerializer < ActiveModel::Serializer
 
   def quote_id
     object.quote_id.to_s
+  end
+
+  def metrics
+    REST::AdMetricSerializer.new.serialize(object.ad)
+  end
+
+  def preview_card
+    group = if instance_options && instance_options[:relationships]
+              instance_options[:relationships].groups_map[object.id] || false
+            else
+              Status.groups_map([object])[object.id] || false
+            end
+
+    REST::PreviewCardSerializer.new(object.preview_card, external_links: object.links, group: group) if object.preview_card
   end
 
   def current_user?
@@ -81,7 +98,7 @@ class REST::StatusSerializer < ActiveModel::Serializer
   end
 
   def content
-    Formatter.instance.format(object)
+    Formatter.instance.format(object, { external_links: object.links })
   end
 
   def url
@@ -159,6 +176,24 @@ class REST::StatusSerializer < ActiveModel::Serializer
     object.active_mentions.to_a.sort_by(&:id)
   end
 
+  def sponsored
+    !!object.ad
+  end
+
+  def tombstone
+    nil
+  end
+
+  def media_attachments
+    object.media_attachments.map do |attachment|
+      REST::MediaAttachmentSerializer.new(attachment, tv_program: object.tv_program)
+    end
+  end
+
+  def tv
+    REST::TvProgramSerializer.new(object.tv_program) if object.tv_program
+  end
+
   class ApplicationSerializer < ActiveModel::Serializer
     attributes :name, :website
   end
@@ -173,6 +208,11 @@ class REST::StatusSerializer < ActiveModel::Serializer
     def username
       object.account_username
     end
+
+    def group_timeline_visible
+      object.group ? object.group_timeline_visible : true
+    end
+
 
     def url
       ActivityPub::TagManager.instance.url_for(object.account)
@@ -204,7 +244,7 @@ class REST::NestedQuoteSerializer < REST::StatusSerializer
     if instance_options && instance_options[:account_relationships]
       instance_options[:account_relationships].muting[object.account_id] ? true : false || instance_options[:account_relationships].blocking[object.account_id] || instance_options[:account_relationships].blocked_by[object.account_id] || instance_options[:account_relationships].domain_blocking[object.account_id] || false
     else
-      current_user.account.muting?(object.account) || object.account.blocking?(current_user.account) || current_user.account.blocking?(object.account) || current_user.account.domain_blocking?(object.account.domain) 
+      current_user.account.muting?(object.account) || object.account.blocking?(current_user.account) || current_user.account.blocking?(object.account) || current_user.account.domain_blocking?(object.account.domain)
     end
   end
 end
@@ -228,6 +268,6 @@ class REST::InReplySerializer < REST::StatusSerializer
 end
 
 class REST::StatusSerializer < ActiveModel::Serializer
-  belongs_to :quote, serializer: REST::NestedQuoteSerializer
-  belongs_to :thread, serializer: REST::InReplySerializer, key: :in_reply_to, if: -> { !@instance_options[:exclude_reply_previews] }
+  belongs_to :quote, serializer: REST::NestedQuoteSerializer, if: -> { (object&.quote&.visibility != 'self' || (current_user? && current_user.account_id == object&.quote&.account_id)) }
+  belongs_to :thread, serializer: REST::InReplySerializer, key: :in_reply_to, if: -> { !@instance_options[:exclude_reply_previews] && (object&.thread&.visibility != 'self' || (current_user? && current_user.account_id == object&.thread&.account_id)) }
 end

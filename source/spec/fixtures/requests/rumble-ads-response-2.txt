@@ -1,0 +1,35 @@
+{
+   "count": 1,
+   "ads": [{
+      "type": 1,
+      "impression": "//domain.com/i?tid=test&cf=abcd",
+      "click": "//domain.com/click21",
+      "asset": "//cdn.domain.com/asset21",
+      "expires": 4
+   },{
+      "type": 1,
+      "impression": "//domain.com/impr22",
+      "click": "//domain.com/click22",
+      "asset": "//cdn.domain.com/asset22",
+      "expires": 4
+   },{
+      "type": 1,
+      "impression": "//domain.com/impr23",
+      "click": "//domain.com/click23",
+      "asset": "//cdn.domain.com/asset23",
+      "expires": 4
+   },{
+      "type": 1,
+      "impression": "//domain.com/impr24",
+      "click": "//domain.com/click24",
+      "asset": "//cdn.domain.com/asset24",
+      "expires": 4
+   },{
+      "type": 1,
+      "impression": "//domain.com/impr25",
+      "click": "//domain.com/click25",
+      "asset": "//cdn.domain.com/asset25",
+      "expires": 4
+   }
+   ]
+}

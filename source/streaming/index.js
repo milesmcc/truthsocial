@@ -108,12 +108,12 @@ const startWorker = (workerId) => {
 
   const pgConfigs = {
     development: {
-      user:     process.env.DB_USER || pg.defaults.user,
+      user: process.env.DB_USER || pg.defaults.user,
       password: process.env.DB_PASS || pg.defaults.password,
-      database: process.env.DB_NAME || 'mastodon_development',
-      host:     process.env.DB_HOST || pg.defaults.host,
-      port:     process.env.DB_PORT || pg.defaults.port,
-      max:      10,
+      database: process.env.DB_NAME || 'truth_development',
+      host: process.env.DB_HOST || pg.defaults.host,
+      port: process.env.DB_PORT || pg.defaults.port,
+      max: 10,
     },
 
     production: {
@@ -578,7 +578,7 @@ const startWorker = (workerId) => {
   /**
    * @param {string[]} ids
    * @param {any} req
-   * @param {function(string, string): void} output
+   * @param {function(string, string, string): void} output
    * @param {function(string[], function(string): void): void} attachCloseHandler
    * @param {boolean=} needsFiltering
    * @param {boolean=} notificationOnly
@@ -594,8 +594,7 @@ const startWorker = (workerId) => {
       const json = parseJSON(message);
 
       if (!json) return;
-
-      const { event, payload, queued_at } = json;
+      const { event, payload, queued_at, feed_ids } = json;
 
       const transmit = () => {
         const now            = new Date().getTime();
@@ -603,7 +602,7 @@ const startWorker = (workerId) => {
         const encodedPayload = typeof payload === 'object' ? JSON.stringify(payload) : payload;
 
         log.silly(req.requestId, `Transmitting for ${accountId}: ${event} ${encodedPayload} Delay: ${delta}ms`);
-        output(event, encodedPayload);
+        output(event, encodedPayload, feed_ids);
       };
 
       if (notificationOnly && event !== 'notification') {
@@ -679,7 +678,7 @@ const startWorker = (workerId) => {
   /**
    * @param {any} req
    * @param {any} res
-   * @return {function(string, string): void}
+   * @return {function(string, string, string): void}
    */
   const streamToHttp = (req, res) => {
     const accountId = req.accountId || req.remoteAddress;
@@ -697,9 +696,10 @@ const startWorker = (workerId) => {
       clearInterval(heartbeat);
     });
 
-    return (event, payload) => {
+    return (event, payload, feed_ids) => {
       res.write(`event: ${event}\n`);
       res.write(`data: ${payload}\n\n`);
+      res.write(`feed_ids: ${feed_ids}\n\n`);
     };
   };
 
@@ -724,15 +724,15 @@ const startWorker = (workerId) => {
    * @param {any} req
    * @param {any} ws
    * @param {string[]} streamName
-   * @return {function(string, string): void}
+   * @return {function(string, string, string): void}
    */
-  const streamToWs = (req, ws, streamName) => (event, payload) => {
+  const streamToWs = (req, ws, streamName) => (event, payload, feed_ids) => {
     if (ws.readyState !== ws.OPEN) {
       log.error(req.requestId, 'Tried writing to closed socket');
       return;
     }
 
-    ws.send(JSON.stringify({ stream: streamName, event, payload }));
+    ws.send(JSON.stringify({ stream: streamName, event, payload, feed_ids: feed_ids }));
   };
 
   /**

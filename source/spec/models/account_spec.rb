@@ -42,6 +42,29 @@ RSpec.describe Account, type: :model do
     end
   end
 
+  describe 'verify/unverify' do
+    it 'verify sets unauth_visibility to true, unverify sets to false' do
+      account = Fabricate(:user).account
+      account.verify!
+      expect(account.user.unauth_visibility).to be_truthy
+
+      account.unverify!
+      expect(account.user.unauth_visibility).to be_falsey
+    end
+  end
+
+  describe '#trust_level' do
+    it 'defaults to untrusted' do
+      account = Fabricate(:account)
+      expect(account.trust_level).to eq(Account::TRUST_LEVELS[:untrusted])
+    end
+
+    it 'can be set to hostile' do
+      account = Fabricate(:account, trust_level: Account::TRUST_LEVELS[:hostile])
+      expect(account.trust_level).to eq(Account::TRUST_LEVELS[:hostile])
+    end
+  end
+
   describe '#local?' do
     it 'returns true when the account is local' do
       account = Fabricate(:account, domain: nil)
@@ -67,7 +90,7 @@ RSpec.describe Account, type: :model do
       it 'returns a webfinger string for the account' do
         Rails.configuration.x.local_domain = 'example.com'
 
-        expect(subject.to_webfinger_s).to eq 'acct:alice'
+        expect(subject.to_webfinger_s).to eq 'acct:alice@example.com'
       end
     end
 
@@ -77,6 +100,42 @@ RSpec.describe Account, type: :model do
 
         expect(subject.local_username_and_domain).to eq 'alice'
       end
+    end
+  end
+
+  describe 'username change' do
+    let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'bob')) }
+    let(:ads_user) { Fabricate(:user, account: Fabricate(:account, username: 'ads_manager')) }
+
+    let!(:application) { Fabricate(:application) }
+    let(:read_token) { Fabricate(:accessible_access_token, application: application, resource_owner_id: user.id, scopes: 'read') }
+    let(:ads_token) { Fabricate(:accessible_access_token, application: application, resource_owner_id: ads_user.id, scopes: 'ads') }
+
+    before do
+      allow(InvalidateAccountStatusesWorker).to receive(:perform_async)
+      allow(InvalidateAdsAccountsWorker).to receive(:perform_async)
+    end
+
+    it 'invalidates status cache on username change' do
+      user.account.update!(username: 'bobby')
+      expect(InvalidateAccountStatusesWorker).to have_received(:perform_async).with(user.account.id)
+    end
+
+    it 'invalidates ads account cache on username change with ads scopes' do
+      ads_token.reload
+      ads_user.account.update!(username: 'bobby')
+      expect(InvalidateAdsAccountsWorker).to have_received(:perform_async).with(ads_user.account.id)
+    end
+
+    it 'does not invalidate ads account cache on username change with read scopes' do
+      read_token.reload
+      user.account.update!(username: 'bobby')
+      expect(InvalidateAdsAccountsWorker).not_to have_received(:perform_async)
+    end
+
+    it 'does not invalidate status cache on account creation' do
+      account = Fabricate(:account, username: 'bob')
+      expect(InvalidateAccountStatusesWorker).not_to have_received(:perform_async).with(account.id)
     end
   end
 
@@ -332,13 +391,13 @@ RSpec.describe Account, type: :model do
     end
 
     it 'returns nil when a username is not present' do
-      results = Account.ci_find_by_username()
+      results = Account.ci_find_by_username
       expect(results).to be_nil
     end
   end
 
   describe '#ci_find_by_usernames' do
-    let(:account_names) { ['Don', 'Damon', 'Mark', 'Ryne', 'Shawon', 'Vance', 'Dwight', 'Jerome', 'Andre'] }
+    let(:account_names) { %w(Don Damon Mark Ryne Shawon Vance Dwight Jerome Andre) }
 
     before do
       account_names.each do |an|
@@ -353,17 +412,17 @@ RSpec.describe Account, type: :model do
     end
 
     it 'finds accounts by usernames case insensitive' do
-      results = Account.ci_find_by_usernames(['dOn', 'mArk', 'ryNe'])
+      results = Account.ci_find_by_usernames(%w(dOn mArk ryNe))
       expect(results.length).to eq(3)
     end
 
     it 'returns an empty relation when a usernames is not present' do
-      results = Account.ci_find_by_usernames()
+      results = Account.ci_find_by_usernames
       expect(results.length).to eq(0)
     end
 
     it 'returns usernames correctly when a some of the names are not found' do
-      results = Account.ci_find_by_usernames(['dOn', 'mArk', 'ryNe', 'billyBob'])
+      results = Account.ci_find_by_usernames(%w(dOn mArk ryNe billyBob))
       expect(results.length).to eq(3)
     end
 
@@ -378,7 +437,7 @@ RSpec.describe Account, type: :model do
     end
 
     it 'only returns one of each accounts' do
-      results = Account.ci_find_by_usernames(['Don', 'Ryne', 'Don'])
+      results = Account.ci_find_by_usernames(%w(Don Ryne Don))
       expect(results.length).to eq(2)
     end
   end
@@ -387,9 +446,9 @@ RSpec.describe Account, type: :model do
     before do
       _missing = Fabricate(
         :account,
-        display_name: "Missing",
-        username: "missing",
-        domain: "missing.com"
+        display_name: 'Missing',
+        username: 'missing',
+        domain: 'missing.com'
       )
     end
 
@@ -408,58 +467,58 @@ RSpec.describe Account, type: :model do
     it 'finds accounts with matching display_name' do
       match = Fabricate(
         :account,
-        display_name: "Display Name",
-        username: "username",
-        domain: "example.com"
+        display_name: 'Display Name',
+        username: 'username',
+        domain: 'example.com'
       )
 
-      results = Account.search_for("display")
+      results = Account.search_for('display')
       expect(results).to eq [match]
     end
 
     it 'finds accounts with matching username' do
       match = Fabricate(
         :account,
-        display_name: "Display Name",
-        username: "username",
-        domain: "example.com"
+        display_name: 'Display Name',
+        username: 'username',
+        domain: 'example.com'
       )
 
-      results = Account.search_for("username")
+      results = Account.search_for('username')
       expect(results).to eq [match]
     end
 
     it 'finds accounts with matching domain' do
       match = Fabricate(
         :account,
-        display_name: "Display Name",
-        username: "username",
-        domain: "example.com"
+        display_name: 'Display Name',
+        username: 'username',
+        domain: 'example.com'
       )
 
-      results = Account.search_for("example")
+      results = Account.search_for('example')
       expect(results).to eq [match]
     end
 
     it 'limits by 10 by default' do
-      11.times.each { Fabricate(:account, display_name: "Display Name") }
-      results = Account.search_for("display")
+      11.times.each { Fabricate(:account, display_name: 'Display Name') }
+      results = Account.search_for('display')
       expect(results.size).to eq 10
     end
 
     it 'accepts arbitrary limits' do
-      2.times.each { Fabricate(:account, display_name: "Display Name") }
-      results = Account.search_for("display", 1)
+      2.times.each { Fabricate(:account, display_name: 'Display Name') }
+      results = Account.search_for('display', 1)
       expect(results.size).to eq 1
     end
 
     it 'ranks multiple matches higher' do
       matches = [
-        { username: "username", display_name: "username" },
-        { display_name: "Display Name", username: "username", domain: "example.com" },
+        { username: 'username', display_name: 'username' },
+        { display_name: 'Display Name', username: 'username', domain: 'example.com' },
       ].map(&method(:Fabricate).curry(2).call(:account))
 
-      results = Account.search_for("username")
+      results = Account.search_for('username')
       expect(results).to eq matches
     end
   end
@@ -479,24 +538,24 @@ RSpec.describe Account, type: :model do
     end
 
     it 'limits by 10 by default' do
-      11.times { Fabricate(:account, display_name: "Display Name") }
-      results = Account.search_for("display")
+      11.times { Fabricate(:account, display_name: 'Display Name') }
+      results = Account.search_for('display')
       expect(results.size).to eq 10
     end
 
     it 'accepts arbitrary limits' do
-      2.times { Fabricate(:account, display_name: "Display Name") }
-      results = Account.search_for("display", 1)
+      2.times { Fabricate(:account, display_name: 'Display Name') }
+      results = Account.search_for('display', 1)
       expect(results.size).to eq 1
     end
 
     it 'ranks followed accounts higher' do
       account = Fabricate(:account)
-      match = Fabricate(:account, username: "Matching")
-      followed_match = Fabricate(:account, username: "Matcher")
+      match = Fabricate(:account, username: 'Matching')
+      followed_match = Fabricate(:account, username: 'Matcher')
       Fabricate(:follow, account: account, target_account: followed_match)
 
-      results = Account.advanced_search_for("match", account)
+      results = Account.advanced_search_for('match', account)
       expect(results).to eq [followed_match, match]
       expect(results.first.rank).to be > results.last.rank
     end
@@ -508,6 +567,7 @@ RSpec.describe Account, type: :model do
     it 'counts statuses' do
       Fabricate(:status, account: subject)
       Fabricate(:status, account: subject)
+      Procedure.process_account_status_statistics_queue
       expect(subject.statuses_count).to eq 2
     end
 
@@ -518,17 +578,22 @@ RSpec.describe Account, type: :model do
 
     it 'is decremented when status is removed' do
       status = Fabricate(:status, account: subject)
+      Procedure.process_account_status_statistics_queue
       expect(subject.statuses_count).to eq 1
       status.destroy
-      expect(subject.statuses_count).to eq 0
+      Procedure.process_account_status_statistics_queue
+      expect(subject.reload.statuses_count).to eq 0
     end
 
     it 'is decremented when status is removed when account is not preloaded' do
       status = Fabricate(:status, account: subject)
+      Procedure.process_account_status_statistics_queue
       expect(subject.reload.statuses_count).to eq 1
       clean_status = Status.find(status.id)
+      Procedure.process_account_status_statistics_queue
       expect(clean_status.association(:account).loaded?).to be false
       clean_status.destroy
+      Procedure.process_account_status_statistics_queue
       expect(subject.reload.statuses_count).to eq 0
     end
   end
@@ -730,7 +795,7 @@ RSpec.describe Account, type: :model do
           { username: 'b', domain: 'b' },
         ].map(&method(:Fabricate).curry(2).call(:account))
 
-        expect(Account.where('id > 0').where.not(username: "ModerationAI").alphabetic).to eq matches
+        expect(Account.where('id > 0').where.not(username: 'ModerationAI').alphabetic).to eq matches
       end
     end
 
@@ -796,7 +861,7 @@ RSpec.describe Account, type: :model do
 
     describe 'partitioned' do
       it 'returns a relation of accounts partitioned by domain' do
-        matches = ['a', 'b', 'a', 'b']
+        matches = %w(a b a b)
         matches.size.times.to_a.shuffle.each do |index|
           matches[index] = Fabricate(:account, domain: matches[index])
         end
@@ -827,6 +892,17 @@ RSpec.describe Account, type: :model do
         expect(Account.suspended).to match_array([account_1])
       end
     end
+
+    describe 'excluded_by_group_account_block' do
+      it 'returns an array of accounts who are not group blocked' do
+        owner = Fabricate(:account)
+        account_2 = Fabricate(:account)
+        group = Fabricate(:group, display_name: 'Group', note: 'Note', owner_account: owner)
+        group.account_blocks.create!(account: account_2)
+
+        expect(Account.excluded_by_group_account_block(group.id).pluck(:id)).to_not include account_2.id
+      end
+    end
   end
 
   context 'when is local' do
@@ -853,10 +929,10 @@ RSpec.describe Account, type: :model do
   include_examples 'AccountAvatar', :account
   include_examples 'AccountHeader', :account
 
-  describe '#increment_count!' do
+  describe '#follow!' do
     subject { Fabricate(:account) }
 
-    it 'increments the count in multi-threaded an environment when account_stat is not yet initialized' do
+    it 'increments the count in a multi-threaded environment using follower queue' do
       subject
 
       increment_by   = 15
@@ -865,14 +941,84 @@ RSpec.describe Account, type: :model do
       threads = Array.new(increment_by) do
         Thread.new do
           true while wait_for_start
-          Account.find(subject.id).increment_count!(:followers_count)
+          Fabricate(:account).follow!(Account.find(subject.id))
         end
       end
 
       wait_for_start = false
       threads.each(&:join)
-
+      Procedure.process_all_statistics_queues
       expect(subject.reload.followers_count).to eq 15
+    end
+  end
+
+  describe '#recent_ads' do
+    let(:account) { Fabricate(:account) }
+    let(:ad_id) { SecureRandom.uuid }
+    let(:title) { 'Ad' }
+    let(:provider) { 'PROVIDER' }
+    let(:asset_url) { 'https://test.com/test.jpg' }
+    let(:click_url) { 'https://test.com/c' }
+    let(:impression_url) { 'https://test.com/i' }
+    let(:params) do
+      {
+        'account_id' => account.id.to_s,
+        'title' => title,
+        'provider_name' => provider,
+        'asset_url' => asset_url,
+        'click_url' => click_url,
+        'impression_url' => impression_url,
+        'ad_id' => ad_id,
+      }
+    end
+
+    before do
+      allow(PreviewCard).to receive(:create!).with({ ad: true, title: title, provider_name: provider, image_remote_url: asset_url, url: click_url }).and_return(Fabricate(:preview_card))
+      @ad = InteractiveAdsService.new(params: params).call
+    end
+
+    it 'returns any recent ad statuses' do
+      expect(account.recent_ads).to_not be_empty
+      expect(account.recent_ads.first.account_id).to eq account.id
+    end
+
+    it 'returns empty if not recent' do
+      expect(account.recent_ads).to_not be_empty
+      ad_status = Status.where(id: @ad.status_id)
+      ad_status.update(created_at: 5.weeks.ago)
+      expect(account.reload.recent_ads).to be_empty
+    end
+  end
+
+  describe '.recent_advertisers' do
+    context 'with advertisers' do
+      let(:advertisers) do
+        [
+          { id: 100, username: 'Mary' },
+          { id: 200, username: 'Joe' },
+        ]
+      end
+      let(:advertisers_beyond_date_range) do
+        [
+          { id: 300, username: 'Frank', travel_days_ago: 31 },
+        ]
+      end
+
+      before do
+        (advertisers + advertisers_beyond_date_range).each do |user_data|
+          travel_to Time.zone.now - (user_data[:travel_days_ago] || 0).days do
+            u = Fabricate(:user, account: Fabricate(:account, id: user_data[:id], username: user_data[:username]))
+            s = Fabricate(:status, account: u.account)
+            Fabricate(:ad, status: s)
+          end
+        end
+      end
+
+      it 'has 2 records that are advertisers within 30 days', :aggregate_failures do
+        results = Account.recent_advertisers(Account.all.pluck(:id))
+        expect(results.count).to eq 2
+        expect(results).to match_array [100, 200]
+      end
     end
   end
 end

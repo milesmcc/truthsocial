@@ -20,7 +20,7 @@ class ActivityPub::CollectionsController < ActivityPub::BaseController
   def set_items
     case params[:id]
     when 'featured'
-      @items = for_signed_account { cache_collection(@account.pinned_statuses, Status) }
+      @items = for_signed_account { cache_collection(@account.pinned_statuses.merge!(StatusPin.profile_pins), Status) }
     when 'tags'
       @items = for_signed_account { @account.featured_tags }
     when 'devices'

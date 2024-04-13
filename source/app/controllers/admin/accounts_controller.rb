@@ -43,13 +43,20 @@ module Admin
 
     def reject
       authorize @account.user, :reject?
-      DeleteAccountService.new.call(@account, reserve_email: false, reserve_username: false)
+      DeleteAccountService.new.call(
+        @account,
+        @current_account.id,
+        deletion_type: 'admin_reject',
+        reserve_email: false,
+        reserve_username: false,
+        skip_activitypub: true,
+      )
       redirect_to admin_pending_accounts_path, notice: I18n.t('admin.accounts.rejected_msg', username: @account.acct)
     end
 
     def destroy
       authorize @account, :destroy?
-      Admin::AccountDeletionWorker.perform_async(@account.id)
+      Admin::AccountDeletionWorker.perform_async(@account.id, @current_account.id)
       redirect_to admin_account_path(@account.id), notice: I18n.t('admin.accounts.destroyed_msg', username: @account.acct)
     end
 

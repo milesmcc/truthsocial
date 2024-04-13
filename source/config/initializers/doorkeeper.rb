@@ -2,6 +2,8 @@ Doorkeeper.configure do
   # Change the ORM that doorkeeper will use (needs plugins)
   orm :active_record
 
+  access_token_class "OauthAccessToken"
+
   # This block will be called to check whether the resource owner is authenticated or not.
   resource_owner_authenticator do
     current_user || redirect_to(new_user_session_url)
@@ -11,22 +13,28 @@ Doorkeeper.configure do
     username = request.params[:username]
 
     if (username.present?)
-      user = if username.include?("@")
+      username.strip!
+      user = if username =~ URI::MailTo::EMAIL_REGEXP
         # Emails on the user table are all stored in lowercase, so this should allow us to login with case-insensitive email
         User.find_by(email: username.downcase)
-      else
+      elsif username.first == '@'
         # Unlike emails usernames are stored as they are entered so we need to query case insensitive
+        Account.ci_find_by_username(username[1..-1])&.user
+      else
         Account.ci_find_by_username(username)&.user
       end
 
       user = nil unless user&.valid_password?(request.params[:password])
     elsif request.params[:mfa_token].present?
-      user = User.get_user_from_token(request.params[:mfa_token])
+      mfa_token = params[:mfa_token].strip
+      code = params[:code].strip
+
+      user = User.get_user_from_token(mfa_token)
 
       if user.present?
-        user = nil unless user.validate_user_token(request.params[:mfa_token])
-        user = nil unless (user.validate_and_consume_otp!(request.params[:code]) ||
-                           user.invalidate_otp_backup_code!(request.params[:code]))
+        user = nil unless user.validate_user_token(mfa_token)
+        user = nil unless (user.validate_and_consume_otp!(code) ||
+                           user.invalidate_otp_backup_code!(code))
       end
     else
       user = nil
@@ -123,7 +131,8 @@ Doorkeeper.configure do
                   :'admin:write',
                   :'admin:write:accounts',
                   :'admin:write:reports',
-                  :crypto
+                  :crypto,
+                  :ads
 
   # Change the way client credentials are retrieved from the request object.
   # By default it retrieves first from the `HTTP_AUTHORIZATION` header, then

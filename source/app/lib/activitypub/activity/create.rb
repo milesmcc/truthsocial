@@ -111,7 +111,7 @@ class ActivityPub::Activity::Create < ActivityPub::Activity
         thread: replied_to_status,
         conversation: conversation_from_uri(@object['conversation']),
         media_attachment_ids: process_attachments.take(4).map(&:id),
-        poll: process_poll,
+        polls: process_poll || [],
         quote: quote_from_url(@object['quoteUrl']),
     }
   end
@@ -284,15 +284,13 @@ class ActivityPub::Activity::Create < ActivityPub::Activity
       items    = @object['oneOf']
     end
 
-    voters_count = @object['votersCount']
+    poll_options =  items.map.with_index { |v, i| { option_number: i, text: v['name'] } }
 
-    @account.polls.new(
+    [Poll.new(
       multiple: multiple,
       expires_at: expires_at,
-      options: items.map { |item| item['name'].presence || item['content'] }.compact,
-      cached_tallies: items.map { |item| item.dig('replies', 'totalItems') || 0 },
-      voters_count: voters_count
-    )
+      options_attributes: poll_options
+    )]
   end
 
   def poll_vote?
@@ -313,7 +311,6 @@ class ActivityPub::Activity::Create < ActivityPub::Activity
     end
 
     increment_voters_count! unless already_voted
-    ActivityPub::DistributePollUpdateWorker.perform_in(3.minutes, replied_to_status.id) unless replied_to_status.preloadable_poll.hide_totals?
   end
 
   def resolve_thread(status)

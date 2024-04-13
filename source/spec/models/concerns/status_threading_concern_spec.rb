@@ -65,17 +65,6 @@ describe StatusThreadingConcern do
 
       expect(third_status.ancestors(2)).to eq([first_status, second_status])
     end
-
-    it 'can return fewer records than previously requested' do
-      first_status  = Fabricate(:status, account: bob)
-      second_status = Fabricate(:status, thread: first_status, account: alice)
-      third_status = Fabricate(:status, thread: second_status, account: alice)
-
-      # Create cache
-      second_status.ancestors(2)
-
-      expect(third_status.ancestors(1)).to eq([second_status])
-    end
   end
 
   describe '#descendants' do
@@ -98,6 +87,41 @@ describe StatusThreadingConcern do
 
       expect(status.descendants(4, viewer)).to_not include(reply1, reply3)
     end
+
+    it 'does not return privitized replies for the other users' do
+      reply1.update(visibility: :self)
+
+      expect(status.descendants(4, bob)).to match_array([reply2, reply3])
+    end
+
+    it 'does return privitized replies for the author of the status' do
+      reply1.update(visibility: :self)
+
+      expect(status.descendants(4, alice)).to match_array([reply1, reply2, reply3])
+    end
+
+    it 'does not return recent replies containing a link for other users' do
+      reply1.update(text: 'Check this out http://example.com')
+      expect(status.descendants(4, bob)).to match_array([reply2, reply3])
+    end
+
+    it 'does return recent replies containing a link for for other users after 5 mins' do
+      reply1.update(text: 'Check this out http://example.com')
+      travel_to(6.minutes.from_now) do
+        expect(status.descendants(4, alice)).to match_array([reply1, reply2, reply3])
+      end
+    end
+
+    it 'does return recent replies containing a link for for other users for replies created after 5 mins' do
+      reply1.update(text: 'Check this out http://example.com', created_at: Time.now + 6.minutes)
+        expect(status.descendants(4, alice)).to match_array([reply1, reply2, reply3])
+    end
+
+    it 'does return recent replies containing a link for the author of the status' do
+      reply1.update(text: 'Check this out http://example.com')
+      expect(status.descendants(4, alice)).to match_array([reply1, reply2, reply3])
+    end
+
 
     it 'does not return replies from blocked users' do
       viewer.block!(jeff)

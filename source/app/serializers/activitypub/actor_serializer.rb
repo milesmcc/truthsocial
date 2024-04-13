@@ -10,7 +10,7 @@ class ActivityPub::ActorSerializer < ActivityPub::Serializer
                      :discoverable, :olm, :suspended
 
   attributes :id, :type, :following, :followers,
-             :inbox, :outbox, :featured, :featured_tags,
+             :featured, :featured_tags,
              :preferred_username, :name, :summary,
              :url, :manually_approves_followers,
              :discoverable, :published
@@ -27,12 +27,6 @@ class ActivityPub::ActorSerializer < ActivityPub::Serializer
 
   class EndpointsSerializer < ActivityPub::Serializer
     include RoutingHelper
-
-    attributes :shared_inbox
-
-    def shared_inbox
-      inbox_url
-    end
   end
 
   has_one :endpoints, serializer: EndpointsSerializer
@@ -43,7 +37,7 @@ class ActivityPub::ActorSerializer < ActivityPub::Serializer
   delegate :suspended?, :instance_actor?, to: :object
 
   def id
-    object.instance_actor? ? instance_actor_url : account_url(object)
+    account_url(object)
   end
 
   def type
@@ -66,16 +60,8 @@ class ActivityPub::ActorSerializer < ActivityPub::Serializer
     account_followers_url(object)
   end
 
-  def inbox
-    object.instance_actor? ? instance_actor_inbox_url : account_inbox_url(object)
-  end
-
   def devices
     account_collection_url(object, :devices)
-  end
-
-  def outbox
-    object.instance_actor? ? instance_actor_outbox_url : account_outbox_url(object)
   end
 
   def featured

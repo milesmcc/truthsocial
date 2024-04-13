@@ -27,6 +27,12 @@ class ActivityPub::TagManager
     when :note, :comment, :activity
       return activity_account_status_url(target.account, target) if target.reblog?
       short_account_status_url(target.account, target)
+    when :group
+      group_url(target)
+    when :group_note
+      group_status_url(target)
+    when :group_request
+      group_request_url(target)
     end
   end
 
@@ -35,17 +41,29 @@ class ActivityPub::TagManager
 
     case target.object_type
     when :person
-      target.instance_actor? ? instance_actor_url : account_url(target)
+      account_url(target)
     when :note, :comment, :activity
       return activity_account_status_url(target.account, target) if target.reblog?
       account_status_url(target.account, target)
     when :emoji
       emoji_url(target)
+    when :group
+      group_url(target)
+    when :group_note
+      group_status_url(target)
+    when :group_request
+      group_request_url(target)
     end
   end
 
   def uri_for_username(username)
     account_url(username: username)
+  end
+
+  def url_for_chat_message(id)
+    message = ChatMessage.find(id)
+    chat = message.chat
+    "#{root_url}chats/#{chat.id}/messages/#{id}"
   end
 
   def generate_uri_for(_target)
@@ -168,5 +186,19 @@ class ActivityPub::TagManager
     end
   rescue ActiveRecord::RecordNotFound
     nil
+  end
+
+  private
+
+  def group_status_url(target)
+    "https://#{Rails.configuration.x.web_domain}/group/#{target.group.slug}/statuses/#{target.id}"
+  end
+
+  def group_request_url(target)
+    "https://#{Rails.configuration.x.web_domain}/group/#{target.group.slug}/manage/requests"
+  end
+
+  def group_url(target)
+    "https://#{Rails.configuration.x.web_domain}/group/#{target.slug}"
   end
 end

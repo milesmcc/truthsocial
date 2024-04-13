@@ -14,6 +14,7 @@ class TagFeed < PublicFeed
   # @option [Boolean] :only_media
   def initialize(tag, account, options = {})
     @tag = tag
+    @group_id = options[:group_id]
     super(account, options)
   end
 
@@ -23,7 +24,7 @@ class TagFeed < PublicFeed
   # @param [Integer] min_id
   # @return [Array<Status>]
   def get(limit, max_id = nil, since_id = nil, min_id = nil)
-    scope = public_scope
+    scope = @group_id ? group_scope : public_scope
 
     scope.merge!(tagged_with_any_scope)
     scope.merge!(tagged_with_all_scope)
@@ -52,5 +53,12 @@ class TagFeed < PublicFeed
 
   def tags_for(names)
     Tag.matching_name(Array(names).take(LIMIT_PER_MODE)).pluck(:id) if names.present?
+  end
+
+  def group_scope
+    Status.without_reblogs
+      .where(group_id: @group_id, reply: false, quote_id: nil)
+      .joins(:account)
+      .merge(Account.without_suspended.without_silenced.excluded_by_group_account_block(@group_id))
   end
 end

@@ -15,6 +15,7 @@ class NotifyService < BaseService
     @activity     = activity
     @type         = type
     @notification = Notification.new(account: @recipient, type: type, activity: @activity)
+
     return if recipient.user.nil? || blocked?
 
     @target_status = target_status
@@ -61,6 +62,50 @@ class NotifyService < BaseService
     false
   end
 
+  def blocked_chat?
+    false
+  end
+
+  def blocked_chat_message_deleted?
+    false
+  end
+
+  def blocked_group_mention?
+    FeedManager.instance.filter?(:mentions, @notification.mention.status, @recipient)
+  end
+
+  def blocked_group_reblog?
+    false
+  end
+
+  def blocked_group_follow?
+    false
+  end
+
+  def blocked_group_favourite?
+    false
+  end
+
+  def blocked_group_delete?
+    false
+  end
+
+  def blocked_group_approval?
+    false
+  end
+
+  def blocked_group_request?
+    false
+  end
+
+  def blocked_group_promoted?
+    false
+  end
+
+  def blocked_group_demoted?
+    false
+  end
+
   def following_sender?
     return @following_sender if defined?(@following_sender)
     @following_sender = @recipient.following?(@notification.from_account) || @recipient.requested?(@notification.from_account)
@@ -92,6 +137,10 @@ class NotifyService < BaseService
 
   def direct_message?
     message? && target_status.direct_visibility?
+  end
+
+  def chat?
+    @notification.type == :chat
   end
 
   def response_to_recipient?
@@ -131,6 +180,7 @@ class NotifyService < BaseService
 
     blocked ||= domain_blocking?                                 # Skip for domain blocked accounts
     blocked ||= @recipient.blocking?(@notification.from_account) # Skip for blocked accounts
+    blocked ||= @notification.from_account.blocking?(@recipient) # Skip for blocked accounts - the other direction
     blocked ||= @recipient.muting_notifications?(@notification.from_account)
     blocked ||= hellbanned?                                      # Hellban
     blocked ||= optional_non_follower?                           # Options

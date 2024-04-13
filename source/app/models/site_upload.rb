@@ -12,6 +12,7 @@
 #  meta              :json
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
+#  file_s3_host      :string(64)
 #
 
 class SiteUpload < ApplicationRecord
@@ -22,6 +23,7 @@ class SiteUpload < ApplicationRecord
   validates :var, presence: true, uniqueness: true
 
   before_save :set_meta
+  before_save :set_file_s3_host
   after_commit :clear_cache
 
   def cache_key
@@ -41,5 +43,10 @@ class SiteUpload < ApplicationRecord
 
   def clear_cache
     Rails.cache.delete(cache_key)
+  end
+
+
+  def set_file_s3_host
+    self.file_s3_host = Paperclip::Attachment.default_options[:s3_host_name]
   end
 end

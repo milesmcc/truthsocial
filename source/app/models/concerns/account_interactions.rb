@@ -80,6 +80,7 @@ module AccountInteractions
 
     has_many :following, -> { order('follows.id desc') }, through: :active_relationships,  source: :target_account
     has_many :followers, -> { order('follows.id desc') }, through: :passive_relationships, source: :account
+    has_many :followers_unordered, through: :passive_relationships, source: :account
 
     # Block relationships
     has_many :block_relationships, class_name: 'Block', foreign_key: 'account_id', dependent: :destroy
@@ -95,6 +96,10 @@ module AccountInteractions
     has_many :conversation_mutes, dependent: :destroy
     has_many :domain_blocks, class_name: 'AccountDomainBlock', dependent: :destroy
     has_many :announcement_mutes, dependent: :destroy
+
+    # Group relationships
+    has_many :group_membership_requests, dependent: :destroy
+    has_many :group_account_blocks, dependent: :destroy
   end
 
   def follow!(other_account, reblogs: nil, notify: nil, uri: nil, rate_limit: false, bypass_limit: false)
@@ -127,6 +132,7 @@ module AccountInteractions
 
   def block!(other_account, uri: nil)
     remove_potential_friendship(other_account)
+    remove_follower_interactions(other_account)
     block_relationships.create_with(uri: uri)
                        .find_or_create_by!(target_account: other_account)
   end
@@ -138,6 +144,7 @@ module AccountInteractions
     mute.save!
 
     remove_potential_friendship(other_account)
+    remove_follower_interactions(other_account)
 
     # When toggling a mute between hiding and allowing notifications, the mute will already exist, so the find_or_create_by! call will return the existing Mute without updating the hide_notifications attribute. Therefore, we check that hide_notifications? is what we want and set it if it isn't.
     if mute.hide_notifications? != notifications
@@ -251,26 +258,6 @@ module AccountInteractions
          .where('users.current_sign_in_at > ?', User::ACTIVE_DURATION.ago)
   end
 
-  def remote_followers_hash(url_prefix)
-    Rails.cache.fetch("followers_hash:#{id}:#{url_prefix}") do
-      digest = "\x00" * 32
-      followers.where(Account.arel_table[:uri].matches("#{url_prefix}%", false, true)).pluck_each(:uri) do |uri|
-        Xorcist.xor!(digest, Digest::SHA256.digest(uri))
-      end
-      digest.unpack('H*')[0]
-    end
-  end
-
-  def local_followers_hash
-    Rails.cache.fetch("followers_hash:#{id}:local") do
-      digest = "\x00" * 32
-      followers.where(domain: nil).pluck_each(:username) do |username|
-        Xorcist.xor!(digest, Digest::SHA256.digest(ActivityPub::TagManager.instance.uri_for_username(username)))
-      end
-      digest.unpack('H*')[0]
-    end
-  end
-
   def whale_following
     following.where(whale: true)
   end
@@ -278,7 +265,13 @@ module AccountInteractions
   private
 
   def remove_potential_friendship(other_account, mutual = false)
-    PotentialFriendshipTracker.remove(id, other_account.id)
-    PotentialFriendshipTracker.remove(other_account.id, id) if mutual
+    InteractionsTracker.new(id, other_account.id).remove
+    InteractionsTracker.new(other_account.id, id).remove if mutual
+  end
+
+  def remove_follower_interactions(other_account)
+    InteractionsTracker.new(id, other_account.id, false, true).remove
+    Redis.current.del("avatars_carousel_list_#{id}")
+    InvalidateSecondaryCacheService.new.call("InvalidateAvatarsCarouselCacheWorker", id)
   end
 end

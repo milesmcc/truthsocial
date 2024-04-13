@@ -21,11 +21,11 @@ class Api::V1::Statuses::RebloggedByAccountsController < Api::BaseController
   end
 
   def default_accounts
-    Account.without_suspended.includes(:statuses, :account_stat).references(:statuses)
+    Account.without_suspended.includes(:statuses, :account_follower, :account_following, :account_status).references(:statuses)
   end
 
   def paginated_statuses
-    Status.where(reblog_of_id: @status.id).where(visibility: [:public, :unlisted]).paginate_by_max_id(
+    Status.where(reblog_of_id: @status.id).where(visibility: [:public, :unlisted, :group]).paginate_by_max_id(
       limit_param(DEFAULT_ACCOUNTS_LIMIT),
       params[:max_id],
       params[:since_id]

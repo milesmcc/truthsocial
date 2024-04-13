@@ -6,7 +6,7 @@ class Api::V1::Accounts::LookupController < Api::BaseController
   before_action :require_authenticated_user!, unless: :allowed_public_access?
 
   def show
-    render json: @account, serializer: REST::AccountSerializer
+    render json: @account, serializer: REST::AccountSerializer, tv_account_lookup: true
   end
 
   private

@@ -25,7 +25,7 @@ class FanOutOnWriteService < BaseService
 
     deliver_to_hashtags(status)
 
-    return if status.reply? && status.in_reply_to_account_id != status.account_id
+    nil if status.reply? && status.in_reply_to_account_id != status.account_id
 
   end
 
@@ -73,8 +73,7 @@ class FanOutOnWriteService < BaseService
   end
 
   def render_anonymous_payload(status)
-    @payload = InlineRenderer.render(status, nil, :status)
-    @payload = Oj.dump(event: :update, payload: @payload)
+    @payload = REST::V2::StatusSerializer.new.serialize_to_json(status)
   end
 
   def deliver_to_hashtags(status)

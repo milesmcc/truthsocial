@@ -32,6 +32,51 @@ RSpec.describe ReblogService, type: :service do
     end
   end
 
+  context 'interactions tracking' do
+    let(:bob)    { Fabricate(:user, account: Fabricate(:account, username: 'bob')) }
+    let(:alice)  { Fabricate(:user, account: Fabricate(:account, username: 'alice')) }
+    let(:status) { Fabricate(:status, account: bob.account, visibility: :public) }
+    let(:text) { 'test status update' }
+    let(:current_week) { Time.now.strftime('%U').to_i }
+
+    context 'reblog from a not-followed account' do
+      let(:initial_score) { 5 }
+
+      before do
+        Redis.current.set("interactions_score:#{bob.account_id}:#{current_week}", 5)
+        subject.call(alice.account, status, visibility: :public)
+      end
+
+      it 'creates interactions record' do
+        expect(Redis.current.zrange("interactions:#{alice.account_id}", 0, -1)).to eq [bob.account_id.to_s]
+        expect(Redis.current.zrange("followers_interactions:#{alice.account_id}:#{current_week}", 0, -1)).to eq []
+      end
+
+      it 'increments target account score for interactions' do
+        expect(Redis.current.get("interactions_score:#{bob.account_id}:#{current_week}")).to eq (initial_score + InteractionsTracker::WEIGHTS[:reblog]).to_s
+      end
+    end
+
+    context 'reblog from a followed account' do
+      let(:initial_score) { 10 }
+
+      before do
+        Redis.current.set("interactions_score:#{bob.account_id}:#{current_week}", 10)
+        alice.account.follow!(bob.account)
+        subject.call(alice.account, status, visibility: :public)
+      end
+
+      it 'creates followers interactions record' do
+        expect(Redis.current.zrange("interactions:#{alice.account_id}", 0, -1)).to eq []
+        expect(Redis.current.zrange("followers_interactions:#{alice.account_id}:#{current_week}", 0, -1)).to eq [bob.account_id.to_s]
+      end
+
+      it 'increments target account score for interactions' do
+        expect(Redis.current.get("interactions_score:#{bob.account_id}:#{current_week}")).to eq (initial_score + InteractionsTracker::WEIGHTS[:reblog]).to_s
+      end
+    end
+  end
+
   context 'ActivityPub' do
     let(:bob)    { Fabricate(:account, username: 'bob', protocol: :activitypub, domain: 'example.com', inbox_url: 'http://example.com/inbox') }
     let(:status) { Fabricate(:status, account: bob) }

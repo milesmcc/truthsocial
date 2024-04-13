@@ -37,7 +37,14 @@ class BlockDomainService < BaseService
     blocked_domain_accounts.without_suspended.in_batches.update_all(suspended_at: @domain_block.created_at, suspension_origin: :local)
 
     blocked_domain_accounts.where(suspended_at: @domain_block.created_at).reorder(nil).find_each do |account|
-      DeleteAccountService.new.call(account, reserve_username: true, suspended_at: @domain_block.created_at)
+      DeleteAccountService.new.call(
+        account,
+        DeleteAccountService::DELETED_BY_SERVICE,
+        deletion_type: 'service_block_domain',
+        reserve_username: true,
+        skip_activitypub: true,
+        suspended_at: @domain_block.created_at,
+      )
     end
   end
 

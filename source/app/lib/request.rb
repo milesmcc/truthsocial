@@ -12,6 +12,27 @@ class HTTP::Timeout::PerOperation
     @socket = socket_class.open(host, port)
     @socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1) if nodelay
   end
+
+  def reset_counter
+    @deadline = nil
+  end
+
+  def readpartial(size, buffer = nil)
+    @deadline ||= Process.clock_gettime(Process::CLOCK_MONOTONIC) + @read_timeout
+
+    timeout = false
+    loop do
+      result = @socket.read_nonblock(size, buffer, exception: false)
+
+      return :eof if result.nil?
+
+      remaining_time = @deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      raise HTTP::TimeoutError, "Read timed out after #{@read_timeout} seconds" if timeout || remaining_time <= 0
+      return result if result != :wait_readable
+
+      timeout = true unless @socket.to_io.wait_readable(remaining_time)
+    end
+  end
 end
 
 class Request
@@ -101,10 +122,9 @@ class Request
   private
 
   def set_common_headers!
-    parsed_url = Addressable::URI.parse(@url)
     @headers[REQUEST_TARGET]    = "#{@verb} #{@url.path}"
     @headers['User-Agent']      = Mastodon::Version.user_agent
-    @headers['Host']            = "#{@url.host}:#{parsed_url.inferred_port}"
+    @headers['Host']            = "#{@url.host}"
     @headers['Date']            = Time.now.utc.httpdate
     @headers['Accept-Encoding'] = 'gzip' if @verb != :head
   end
@@ -142,7 +162,7 @@ class Request
   end
 
   def use_proxy?(url)
-    parsed = URI.parse(url)
+    parsed = URI.parse(Addressable::URI.encode(url))
     return false if private_address?(parsed.host)
     Rails.configuration.x.http_client_proxy.present?
   end
@@ -161,6 +181,7 @@ class Request
 
     address = Resolv.getaddress(hostname)
     [
+      IPAddr.new('127.0.0.1'),
       IPAddr.new('10.0.0.0/8'),
       IPAddr.new('172.16.0.0/12'),
       IPAddr.new('192.168.0.0/16'),
@@ -174,7 +195,7 @@ class Request
   end
 
   module ClientLimit
-    def body_with_limit(limit = 1.megabyte)
+    def body_with_limit(limit = 4.megabyte)
       raise Mastodon::LengthValidationError if content_length.present? && content_length > limit
 
       if charset.nil?

@@ -27,12 +27,13 @@
 #  thumbnail_updated_at        :datetime
 #  thumbnail_remote_url        :string
 #  external_video_id           :string
+#  file_s3_host                :string(64)
 #
 
 class MediaAttachment < ApplicationRecord
   self.inheritance_column = nil
 
-  enum type: [:image, :gifv, :video, :unknown, :audio]
+  enum type: [:image, :gifv, :video, :unknown, :audio, :tv]
   enum processing: [:queued, :in_progress, :complete, :failed], _prefix: true
 
   MAX_DESCRIPTION_LENGTH = 1_500
@@ -48,10 +49,10 @@ class MediaAttachment < ApplicationRecord
     small
   ).freeze
 
-  IMAGE_MIME_TYPES             = %w(image/jpeg image/png image/gif).freeze
-  VIDEO_MIME_TYPES             = %w(video/webm video/mp4 video/quicktime video/ogg).freeze
-  VIDEO_CONVERTIBLE_MIME_TYPES = %w(video/webm video/quicktime).freeze
-  AUDIO_MIME_TYPES             = %w(audio/wave audio/wav audio/x-wav audio/x-pn-wave audio/ogg audio/mpeg audio/mp3 audio/webm audio/flac audio/aac audio/m4a audio/x-m4a audio/mp4 audio/3gpp video/x-ms-asf).freeze
+  IMAGE_MIME_TYPES = %w(image/jpeg image/png image/gif).freeze
+  VIDEO_MIME_TYPES = %w(video/webm video/mp4 video/quicktime video/ogg application/octet-stream).freeze
+  VIDEO_CONVERTIBLE_MIME_TYPES = %w(video/webm video/quicktime application/octet-stream).freeze
+  AUDIO_MIME_TYPES = %w(audio/wave audio/wav audio/x-wav audio/x-pn-wave audio/ogg audio/mpeg audio/mp3 audio/webm audio/flac audio/aac audio/m4a audio/x-m4a audio/mp4 audio/3gpp video/x-ms-asf).freeze
 
   BLURHASH_OPTIONS = {
     x_comp: 4,
@@ -152,13 +153,14 @@ class MediaAttachment < ApplicationRecord
   }.freeze
 
   IMAGE_LIMIT = 10.megabytes
-  VIDEO_LIMIT = 40.megabytes
+  VIDEO_LIMIT = 450.megabytes
 
-  MAX_VIDEO_MATRIX_LIMIT = 2_304_000 # 1920x1200px
-  MAX_VIDEO_FRAME_RATE   = 60
+  MAX_VIDEO_MATRIX_LIMIT = 8_294_400 # 3840 x 2160
+  MAX_VIDEO_FRAME_RATE = 60
+  MAX_VIDEO_DURATION_LIMIT = 900 # 900 seconds
 
-  belongs_to :account,          inverse_of: :media_attachments, optional: true
-  belongs_to :status,           inverse_of: :media_attachments, optional: true
+  belongs_to :account, inverse_of: :media_attachments, optional: true
+  belongs_to :status, inverse_of: :media_attachments, optional: true
   belongs_to :scheduled_status, inverse_of: :media_attachments, optional: true
 
   has_many :moderation_records
@@ -169,12 +171,13 @@ class MediaAttachment < ApplicationRecord
                     convert_options: GLOBAL_CONVERT_OPTIONS
 
   before_file_post_process :set_type_and_extension
-  before_file_post_process :do_not_process_video_files
+  before_file_post_process :check_video_dimensions
 
   validates_attachment_content_type :file, content_type: IMAGE_MIME_TYPES + VIDEO_MIME_TYPES + AUDIO_MIME_TYPES
-  validates_attachment_size :file, less_than: IMAGE_LIMIT, unless: :larger_media_format?
-  validates_attachment_size :file, less_than: VIDEO_LIMIT, if: :larger_media_format?
+  validates_attachment_size :file, less_than: ->(m) { m.larger_media_format? ? VIDEO_LIMIT : IMAGE_LIMIT }
   remotable_attachment :file, VIDEO_LIMIT, suppress_errors: false, download_on_assign: false, attribute_name: :remote_url
+
+  remotable_attachment :file, IMAGE_LIMIT
 
   has_attached_file :thumbnail,
                     styles: THUMBNAIL_STYLES,
@@ -183,7 +186,7 @@ class MediaAttachment < ApplicationRecord
 
   validates_attachment_content_type :thumbnail, content_type: IMAGE_MIME_TYPES
   validates_attachment_size :thumbnail, less_than: IMAGE_LIMIT
-  remotable_attachment :thumbnail, IMAGE_LIMIT, suppress_errors: true, download_on_assign: false
+  remotable_attachment :thumbnail, IMAGE_LIMIT, suppress_errors: true
 
   include Attachmentable
 
@@ -193,7 +196,7 @@ class MediaAttachment < ApplicationRecord
   validates :thumbnail, absence: true, if: -> { local? && !audio_or_video? }
 
   scope :attached,   -> { where.not(status_id: nil).or(where.not(scheduled_status_id: nil)) }
-  scope :unattached, -> { where(status_id: nil, scheduled_status_id: nil) }
+  scope :unattached, -> { select('*').from('(select a.* from media_attachments a where a.status_id is null and a.scheduled_status_id is null and not exists (select 1 from chats.message_media_attachments m where m.media_attachment_id = a.id)) as media_attachments') }
   scope :local,      -> { where(remote_url: '') }
   scope :remote,     -> { where.not(remote_url: '') }
   scope :cached,     -> { remote.where.not(file_file_name: nil) }
@@ -255,10 +258,13 @@ class MediaAttachment < ApplicationRecord
   end
 
   after_commit :enqueue_processing, on: :create
+  after_commit :publish_event, if: -> { saved_change_to_processing?(to: 'complete') }
   after_commit :reset_parent_cache, on: :update
 
   before_create :prepare_description, unless: :local?
   before_create :set_shortcode
+  before_save :set_file_s3_host
+
   before_create :set_processing
 
   after_post_process :set_meta
@@ -275,7 +281,9 @@ class MediaAttachment < ApplicationRecord
     private
 
     def file_styles(attachment)
-      if attachment.instance.file_content_type == 'image/gif' || VIDEO_CONVERTIBLE_MIME_TYPES.include?(attachment.instance.file_content_type)
+      # only convert gifs to video.  Don't convert hevc and webm videos
+      # Let those fall to the video_styles where they will just be passthrough encoded
+      if attachment.instance.file_content_type == 'image/gif' # || VIDEO_CONVERTIBLE_MIME_TYPES.include?(attachment.instance.file_content_type)
         VIDEO_CONVERTED_STYLES
       elsif IMAGE_MIME_TYPES.include?(attachment.instance.file_content_type)
         IMAGE_STYLES
@@ -310,6 +318,10 @@ class MediaAttachment < ApplicationRecord
       self.shortcode = SecureRandom.urlsafe_base64(14)
       break if MediaAttachment.find_by(shortcode: shortcode).nil?
     end
+  end
+
+  def set_file_s3_host
+    self.file_s3_host = Paperclip::Attachment.default_options[:s3_host_name]
   end
 
   def prepare_description
@@ -352,6 +364,10 @@ class MediaAttachment < ApplicationRecord
 
   def set_meta
     file.instance_write :meta, populate_meta
+  end
+
+  def publish_event
+    EventProvider::EventProvider.new('asset.created', ::AssetCreatedEvent, self).call
   end
 
   def populate_meta
@@ -402,10 +418,10 @@ class MediaAttachment < ApplicationRecord
 
   def enqueue_processing
     if video?
-      self.processing = :complete
-      self.save
-    else
-      PostProcessMediaWorker.perform_async(id) if delay_processing?
+      self.processing = :queued
+      save
+    elsif delay_processing?
+      PostProcessMediaWorker.perform_async(id)
     end
   end
 

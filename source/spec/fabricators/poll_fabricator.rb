@@ -1,8 +1,10 @@
 Fabricator(:poll) do
-  account
+  expires_at { 7.days.from_now }
+  options(count: 2, fabricator: :poll_option)
   status
-  expires_at  { 7.days.from_now }
-  options     %w(Foo Bar)
-  multiple    false
-  hide_totals false
+end
+
+Fabricator(:poll_option) do
+  option_number { Fabricate.sequence(:number, 0).odd? ? 1 : 0 }
+  text { Faker::Alphanumeric.alphanumeric(number: 20) }
 end

@@ -13,7 +13,7 @@ RSpec.describe Api::V1::Polls::VotesController, type: :controller do
     let(:poll) { Fabricate(:poll) }
 
     before do
-      post :create, params: { poll_id: poll.id, choices: %w(1) }
+      post :create, params: { poll_id: poll.id, choices: [poll.options.last.option_number.to_s] }
     end
 
     it 'returns http success' do
@@ -21,14 +21,19 @@ RSpec.describe Api::V1::Polls::VotesController, type: :controller do
     end
 
     it 'creates a vote' do
-      vote = poll.votes.where(account: user.account).first
+      vote = PollVote.where(poll_id: poll.id, account: user.account).first
 
       expect(vote).to_not be_nil
-      expect(vote.choice).to eq 1
+      expect(vote.option_number).to eq 1
     end
 
-    it 'updates poll tallies' do
-      expect(poll.reload.cached_tallies).to eq [0, 1]
+    it 'updates the stats' do
+      Procedure.process_poll_option_statistics_queue
+      expect(StatisticPollOption.where(poll_id: poll.id, option_number: 0).first).to eq nil
+      expect(StatisticPollOption.where(poll_id: poll.id, option_number: 1).first.votes).to eq 1
+
+      expect(StatisticPoll.where(poll_id: poll.id).first.votes).to eq 1
+      expect(StatisticPoll.where(poll_id: poll.id).first.voters).to eq 1
     end
   end
 end

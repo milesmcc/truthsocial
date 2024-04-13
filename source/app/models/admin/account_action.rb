@@ -19,6 +19,9 @@ class Admin::AccountAction
     unsuspend
     verify
     unverify
+    enable_sms_reverification
+    disable_sms_reverification
+    enable_feature
   ).freeze
 
   attr_accessor :target_account,
@@ -26,7 +29,8 @@ class Admin::AccountAction
                 :type,
                 :text,
                 :report_id,
-                :warning_preset_id
+                :warning_preset_id,
+                :feature_name
 
   attr_reader :warning, :send_email_notification, :include_statuses, :duration
 
@@ -54,7 +58,6 @@ class Admin::AccountAction
     end
 
     process_email!
-    process_reports!
     process_queue!
   end
 
@@ -106,6 +109,12 @@ class Admin::AccountAction
       handle_remove_avatar!
     when 'remove_header'
       handle_remove_header!
+    when 'enable_sms_reverification'
+      handle_enable_sms_reverification!
+    when 'disable_sms_reverification'
+      handle_disable_sms_reverification!
+    when 'enable_feature'
+      handle_enable_feature!
     end
   end
 
@@ -152,18 +161,24 @@ class Admin::AccountAction
     log_action(:ban, target_account.user)
     target_account.suspend!
     target_account.user.disable!
+    remove_scheduled_unsuspensions
+    InteractionsTracker.new(target_account).remove_total_score
+    DisabledUserUnfollowWorker.perform_async(target_account.id)
+    revoke_access_tokens(target_account)
   end
 
   def handle_disable!
     authorize(target_account.user, :disable?)
     log_action(:disable, target_account.user)
     target_account.user&.disable!
+    DisabledUserUnfollowWorker.perform_in(7.days, target_account.id)
   end
 
   def handle_enable!
     authorize(target_account.user, :enable?)
     log_action(:enable, target_account.user)
     target_account.user&.enable!
+    DisabledUserRefollowWorker.perform_async(target_account.id)
   end
 
   def handle_sensitive!
@@ -188,6 +203,7 @@ class Admin::AccountAction
     authorize(target_account, :suspend?)
     log_action(:suspend, target_account)
     target_account.suspend!(origin: :local)
+    InteractionsTracker.new(target_account).remove_total_score
 
     schedule_unsuspension! unless account_suspension_policy.strikes_expended?
   end
@@ -196,6 +212,7 @@ class Admin::AccountAction
     authorize(target_account, :unsuspend?)
     log_action(:unsuspend, target_account)
     target_account.unsuspend!
+    DisabledUserRefollowWorker.perform_async(target_account.id)
   end
 
   def handle_verify!
@@ -224,16 +241,37 @@ class Admin::AccountAction
     target_account.save!
   end
 
+  def handle_enable_sms_reverification!
+    authorize(target_account.user, :enable_sms_reverification?)
+    log_action(:enable_sms_reverification, target_account.user)
+    user = target_account.user
+    UserSmsReverificationRequired.create(user: user) if user
+  end
+
+  def handle_disable_sms_reverification!
+    authorize(target_account.user, :disable_sms_reverification?)
+    log_action(:disable_sms_reverification, target_account.user)
+    user = target_account.user
+    UserSmsReverificationRequired.find(user.id)&.destroy if user
+  end
+
+  def handle_enable_feature!
+    authorize(target_account.user, :enable_feature?)
+    feature_flag = ::Configuration::FeatureFlag.find_by!(name: feature_name)
+    ::Configuration::AccountEnabledFeature.create!(account_id: target_account.id, feature_flag: feature_flag)
+  end
+
   def text_for_warning
     [warning_preset&.text, text].compact.join("\n\n")
   end
 
-  def queue_suspension_worker!
-    Admin::SuspensionWorker.perform_async(target_account.id)
-  end
-
   def process_queue!
-    queue_suspension_worker! if type == 'suspend'
+    case type
+    when 'suspend', 'ban'
+      Admin::SuspensionWorker.perform_async(target_account.id)
+    when 'unsuspend'
+      Admin::UnsuspensionWorker.perform_async(target_account.id)
+    end
   end
 
   def process_email!
@@ -272,5 +310,15 @@ class Admin::AccountAction
 
   def account_suspension_policy
     @account_suspension_policy ||= AccountSuspensionPolicy.new(target_account)
+  end
+
+  def remove_scheduled_unsuspensions
+    queue = Sidekiq::ScheduledSet.new
+    jobs = queue.select { |job| job.klass == 'Admin::UnsuspensionWorker' && job.args[0] == target_account.id }
+    jobs.each(&:delete)
+  end
+
+  def revoke_access_tokens(target_account)
+    OauthAccessToken.where(resource_owner_id: target_account.user.id).update_all(revoked_at: Time.now.utc)
   end
 end

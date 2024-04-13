@@ -6,14 +6,21 @@ class Api::V1::Admin::AccountsController < Api::BaseController
 
   LIMIT = 100
 
+  before_action :set_log_level
+
   before_action -> { doorkeeper_authorize! :'admin:read', :'admin:read:accounts' }, only: [:index, :show]
   before_action -> { doorkeeper_authorize! :'admin:write', :'admin:write:accounts' }, except: [:index, :show]
   before_action :require_staff!
   before_action :set_accounts, only: :index
   before_action :set_account, except: [:index, :create, :bulk_approve]
+  before_action :set_policy, only: :create
   before_action :require_local_account!, only: [:enable, :approve, :reject]
+  before_action :set_geo, only: [:create]
+  before_action :set_registrations, only: [:create], if: -> { params[:token].present? }
 
   after_action :insert_pagination_headers, only: :index
+  after_action :registration_cleanup, only: :create, if: -> { @user.persisted? && @registration }
+  after_action :revert_log_level
 
   FILTER_PARAMS = %i(
     local
@@ -33,11 +40,25 @@ class Api::V1::Admin::AccountsController < Api::BaseController
     sms
   ).freeze
 
+  GEO_PARAMS = %i(
+    country_name
+    country_code
+    city_name
+    region_code
+    region_name
+  ).freeze
+
   PAGINATION_PARAMS = (%i(limit) + FILTER_PARAMS).freeze
 
   def index
     authorize :account, :index?
-    render json: @accounts, each_serializer: REST::Admin::AccountSerializer
+    render json: Panko::ArraySerializer.new(
+      @accounts,
+      each_serializer: REST::V2::Admin::AccountSerializer,
+      context: {
+        advertisers: Account.recent_advertisers(@accounts.pluck(:id)),
+      }
+    ).to_json
   end
 
   def show
@@ -47,7 +68,7 @@ class Api::V1::Admin::AccountsController < Api::BaseController
 
   def update
     update_hash = update_params.to_h
-    if (!@account.user.not_ready_for_approval? && !@account.user.ready_by_csv_import?)
+    if !@account.user.not_ready_for_approval? && !@account.user.ready_by_csv_import?
       update_hash[:approved] = true
       export_prometheus_metric(:approves)
     end
@@ -61,12 +82,15 @@ class Api::V1::Admin::AccountsController < Api::BaseController
   end
 
   def create
+    Rails.logger.info("Sign-up logs: attempting to register: #{params[:email]}")
+
     account = Account.new(
       username: params[:username],
-      discoverable: params[:role] != 'moderator'
+      discoverable: params[:role] != 'moderator',
+      feeds_onboarded: true
     )
 
-    user = User.new(
+    @user = User.new(
       email: params[:email],
       password: params[:password],
       sms: params[:sms],
@@ -75,19 +99,26 @@ class Api::V1::Admin::AccountsController < Api::BaseController
       approved: ['true', true].include?(params[:approved]),
       moderator: params[:role] == 'moderator',
       confirmed_at: params[:confirmed] ? Time.now.utc : nil,
-      bypass_invite_request_check: true
+      bypass_invite_request_check: true,
+      policy: @policy,
+      sign_up_city_id: @city,
+      sign_up_country_id: @country,
+      sign_up_ip: params[:sign_up_ip]
     )
 
-    user.account = account
+    @user.account = account
     account.verify! if ['true', true].include?(params[:verified])
-    user.set_waitlist_position unless user.approved
+    @user.set_waitlist_position unless @user.approved
 
-    if user.save
-      send_registration_email(user)
+    if @user.save
+      send_registration_email
       export_prometheus_metric(:registrations)
-      render json: user.account, serializer: REST::Admin::AccountCreateSerializer
+      dispatch_rmq_event(account, params)
+      log_successful_attempt
+      render json: @user.account, serializer: REST::Admin::AccountCreateSerializer
     else
-      user_errors = user.errors.to_h
+      user_errors = @user.errors.to_h
+      log_failed_attempt(user_errors)
       render json: { errors: user_errors }, status: 422
     end
   end
@@ -126,13 +157,20 @@ class Api::V1::Admin::AccountsController < Api::BaseController
 
   def reject
     authorize @account.user, :reject?
-    DeleteAccountService.new.call(@account, reserve_email: false, reserve_username: false)
+    DeleteAccountService.new.call(
+      @account,
+      @current_account.id,
+      deletion_type: 'api_admin_reject',
+      reserve_email: false,
+      reserve_username: false,
+      skip_activitypub: true,
+    )
     render json: @account, serializer: REST::Admin::AccountSerializer
   end
 
   def destroy
     authorize @account, :destroy?
-    Admin::AccountDeletionWorker.perform_async(@account.id)
+    Admin::AccountDeletionWorker.perform_async(@account.id, @current_account.id)
     render json: @account, serializer: REST::Admin::AccountSerializer
   end
 
@@ -231,14 +269,87 @@ class Api::V1::Admin::AccountsController < Api::BaseController
   end
 
   def export_prometheus_metric(metric_type)
-    Prometheus::ApplicationExporter::increment(metric_type)
+    Prometheus::ApplicationExporter.increment(metric_type)
   end
 
-  def send_registration_email(user)
-    if user.approved?
-      NotificationMailer.user_approved(user.account).deliver_later
+  def send_registration_email
+    if @user.approved?
+      NotificationMailer.user_approved(@user.account).deliver_later
     else
-      UserMailer.waitlisted(user).deliver_later
+      UserMailer.waitlisted(@user).deliver_later
     end
+  end
+
+  def set_policy
+    @policy = Policy.last
+  end
+
+  def geo_params
+    params.permit(*GEO_PARAMS)
+  end
+
+  def set_geo
+    geo = GeoService.new(
+      city_name: geo_params[:city_name],
+      country_code: geo_params[:country_code],
+      country_name: geo_params[:country_name],
+      region_name: geo_params[:region_name],
+      region_code: geo_params[:region_code]
+    )
+
+    @city = geo.city
+    @country = geo.country
+  end
+
+  def set_log_level
+    @current_log_level = Rails.logger.level
+    Rails.logger.level = :debug
+  end
+
+  def revert_log_level
+    Rails.logger.level = @current_log_level
+  end
+
+  def set_registrations
+    @registration = Registration.find_by(token: params[:token])
+    if @registration&.ios_device?
+      @registration_credential = @registration.registration_webauthn_credential
+      @credential = @registration_credential&.webauthn_credential
+      credential_error = 'Webauthn Credential is already associated with an account'
+      render json: { errors: credential_error }, status: 422 and return if @credential&.user.present?
+    end
+  end
+
+  def registration_cleanup
+    if @registration.ios_device?
+      @credential&.update!(user: @user) # Do we want to fail loudly?
+    else
+      user_params = { user_id: @user.id }
+      verification = DeviceVerification.find_by("details ->> 'registration_token' = '#{ActiveRecord::Base.sanitize_sql(@registration.token)}'")
+      details = verification.details
+      new_details = details.merge(user_params)
+      verification.update(details: new_details)
+    end
+
+    registration_otc = @registration.registration_one_time_challenge
+    otc = registration_otc.one_time_challenge
+    otc.destroy # This will also cascade delete the RegistrationOneTimeChallenge record.
+    @registration.destroy
+  end
+
+  def dispatch_rmq_event(account, params)
+    EventProvider::EventProvider.new('account.created', AccountCreatedEvent, account, params).call
+  end
+
+  def log_failed_attempt(errors)
+    filters = Rails.application.config.filter_parameters
+    f = ActiveSupport::ParameterFilter.new filters
+    filtered_params = f.filter params
+
+    Rails.logger.info("Sign-up logs: unsuccessful registration: #{errors}.  params: #{filtered_params}")
+  end
+
+  def log_successful_attempt
+    Rails.logger.info("Sign-up logs: successful registration: #{params[:email]}")
   end
 end

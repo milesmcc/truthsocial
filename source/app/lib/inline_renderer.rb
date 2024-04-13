@@ -21,11 +21,13 @@ class InlineRenderer
       serializer = REST::ReactionSerializer
     when :encrypted_message
       serializer = REST::EncryptedMessageSerializer
+    when :chat
+      serializer = REST::ChatSerializer
     else
       return
     end
 
-    serializable_resource = ActiveModelSerializers::SerializableResource.new(@object, serializer: serializer, scope: current_user, scope_name: :current_user)
+    serializable_resource = ActiveModelSerializers::SerializableResource.new(@object, serializer: serializer, scope: current_user, scope_name: :current_user, current_user: @current_account&.user)
     serializable_resource.as_json
   end
 

@@ -5,7 +5,8 @@ class REST::AccountSerializer < ActiveModel::Serializer
 
   attributes :id, :username, :acct, :display_name, :locked, :bot, :discoverable, :group, :created_at,
              :note, :url, :avatar, :avatar_static, :header, :header_static, :followers_count,
-             :following_count, :statuses_count, :last_status_at, :verified, :location, :website
+             :following_count, :statuses_count, :last_status_at, :verified, :location, :website, :accepting_messages, :chats_onboarded,
+             :feeds_onboarded, :tv_onboarded, :show_nonmember_group_statuses, :pleroma, :tv_account, :receive_only_follow_mentions
 
   has_one :moved_to_account, key: :moved, serializer: REST::AccountSerializer, if: :moved_and_not_nested?
 
@@ -29,9 +30,9 @@ class REST::AccountSerializer < ActiveModel::Serializer
 
   delegate :verified?, to: :object
 
-  delegate :location, to: :object
-
-  delegate :website, to: :object
+  def website
+    object.suspended? ? '' : object.website
+  end
 
   def acct
     object.pretty_acct
@@ -42,7 +43,7 @@ class REST::AccountSerializer < ActiveModel::Serializer
   end
 
   def url
-    ActivityPub::TagManager.instance.url_for(object)
+    object.suspended? ? '' : ActivityPub::TagManager.instance.url_for(object)
   end
 
   def avatar
@@ -54,15 +55,23 @@ class REST::AccountSerializer < ActiveModel::Serializer
   end
 
   def header
-    object&.header_file_name ?  full_asset_url(object.suspended? ? object.header.default_url : object.header_original_url) : ''
+    if object&.header_file_name
+      full_asset_url(object.suspended? ? object.header.default_url : object.header_original_url)
+    else
+      ''
+    end
   end
 
   def header_static
-    object&.header_file_name ? full_asset_url(object.suspended? ? object.header.default_url : object.header_static_url) : ''
+    if object&.header_file_name
+      full_asset_url(object.suspended? ? object.header.default_url : object.header_static_url)
+    else
+      ''
+    end
   end
 
   def created_at
-    object.created_at.midnight.as_json
+    object.created_at.as_json
   end
 
   def last_status_at
@@ -101,9 +110,27 @@ class REST::AccountSerializer < ActiveModel::Serializer
     object.suspended?
   end
 
+  def pleroma
+    {
+      accepts_chat_messages: object.accepting_messages,
+    }
+  end
+
+  def location
+    object.suspended? ? '' : object.location
+  end
+
   delegate :suspended?, to: :object
 
   def moved_and_not_nested?
     object.moved? && object.moved_to_account.moved_to_account_id.nil?
+  end
+
+  def tv_account
+    instance_options[:tv_account_lookup] && instance_options[:tv_account_lookup] == true ? !!object.tv_channel_account : false
+  end
+
+  def chats_onboarded
+    true
   end
 end

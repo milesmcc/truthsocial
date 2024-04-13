@@ -26,7 +26,5 @@ class ActivityPub::Activity::Update < ActivityPub::Activity
 
     status = Status.find_by(uri: object_uri, account_id: @account.id)
     return if status.nil? || status.preloadable_poll.nil?
-
-    ActivityPub::ProcessPollService.new.call(status.preloadable_poll, @object)
   end
 end

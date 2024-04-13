@@ -4,7 +4,7 @@ class RemoveStatusService < BaseService
   include Redisable
   include Payloadable
 
-  BAILEY_PERCENTAGE = (ENV['BAILEY_PERCENTAGE'] || "0").to_i
+  BAILEY_PERCENTAGE = (ENV['BAILEY_PERCENTAGE'] || '0').to_i
 
   # Delete a status
   # @param   [Status] status
@@ -17,12 +17,17 @@ class RemoveStatusService < BaseService
     @status   = status
     @account  = status.account
     @immediate = options.key?(:immediate) ? options[:immediate] : false
-    @options  = options
+    @options = options
 
     @status.discard
 
+    EventProvider::EventProvider.new('status.removed', StatusRemovedEvent, @status, options[:called_by_id]).call if options[:called_by_id] == @status.account_id
+
     RedisLock.acquire(lock_options) do |lock|
       if lock.acquired?
+
+        remove_user_interactions!
+        remove_from_timeline_cache
 
         if rand(1..100) <= BAILEY_PERCENTAGE
           send_to_bailey
@@ -33,12 +38,7 @@ class RemoveStatusService < BaseService
 
           remove_from_lists
 
-          # There is no reason to send out Undo activities when the
-          # cause is that the original object has been removed, since
-          # original object being removed implicitly removes reblogs
-          # of it. The Delete activity of the original is forwarded
-          # separately.
-          remove_from_remote_reach if @account.local? && !@options[:original_removed]
+          remove_from_group
 
           unless @status.reblog?
             remove_reblogs
@@ -55,6 +55,9 @@ class RemoveStatusService < BaseService
           remove_media
           notify_user if options[:notify_user]
         end
+
+        remove_ad_data if @status.ad?
+        purge_cache
 
         @status.destroy! if @immediate
       else
@@ -81,7 +84,6 @@ class RemoveStatusService < BaseService
     end
   end
 
-
   def remove_from_whale_list
     FeedManager.instance.remove_from_whale(@status)
   end
@@ -99,19 +101,6 @@ class RemoveStatusService < BaseService
 
     @status.active_mentions.find_each do |mention|
       redis.publish("timeline:#{mention.account_id}", @payload)
-    end
-  end
-
-  def remove_from_remote_reach
-    # Followers, relays, people who got mentioned in the status,
-    # or who reblogged it from someone else might not follow
-    # the author and wouldn't normally receive the delete
-    # notification - so here, we explicitly send it to them
-
-    status_reach_finder = StatusReachFinder.new(@status)
-
-    ActivityPub::DeliveryWorker.push_bulk(status_reach_finder.inboxes) do |inbox_url|
-      [signed_activity_json, @account.id, inbox_url]
     end
   end
 
@@ -142,6 +131,12 @@ class RemoveStatusService < BaseService
     end
   end
 
+  def remove_from_group
+    return unless @status.group_visibility?
+
+    redis.publish("timeline:group:#{@status.group_id}", @payload)
+  end
+
   def remove_media
     return if @options[:redraft] || !@immediate
 
@@ -153,8 +148,35 @@ class RemoveStatusService < BaseService
   end
 
   def send_to_bailey
-    Redis.current.lpush('elixir:distribution', @payload)
-    Rails.logger.info("bailey_debug: sending for deletion status #{@status.id}")
+    # Don't create job.  Bailey not cleaning up deletes at the moment.
   end
 
+  def remove_user_interactions!
+    if @status.reply? && @account.id != @status.in_reply_to_account_id
+      InteractionsTracker.new(@account.id, @status.in_reply_to_account_id, :reply, @account.following?(@status.in_reply_to_account_id), @status.group).untrack
+    elsif @status.quote? && @account.id != @status.quote.account_id
+      InteractionsTracker.new(@account.id, @status.quote.account_id, :quote, @account.following?(@status.quote.account_id), @status.quote.group).untrack
+    end
+  end
+
+  def remove_from_timeline_cache
+    redis.del("sevro:#{@status.id}")
+  end
+
+  def remove_ad_data
+    @status.preview_cards.each(&:destroy)
+    @status.ad&.destroy
+  end
+end
+
+def purge_cache
+  purge_status(@status)
+  Status.where(in_reply_to_id: @status.id).or(Status.where(quote_id: @status.id)).in_batches.each_record do |reply|
+    purge_status(reply)
+  end
+end
+
+def purge_status(status)
+  Rails.cache.delete(status)
+  InvalidateSecondaryCacheService.new.call('InvalidateStatusCacheWorker', status)
 end

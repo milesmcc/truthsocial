@@ -52,7 +52,7 @@ describe Oauth::AuthorizedApplicationsController do
     end
 
     it 'revokes access tokens for the application' do
-      expect(Doorkeeper::AccessToken.where(application: application).first.revoked_at).to_not be_nil
+      expect(OauthAccessToken.where(application: application).first.revoked_at).to_not be_nil
     end
 
     it 'removes subscriptions for the application\'s access tokens' do

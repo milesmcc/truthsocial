@@ -5,13 +5,29 @@ class Api::V1::Truth::PasswordsController < Api::BaseController
   before_action :set_confirm_user, only: :reset_confirm
   before_action :set_request_user, only: :reset_request
   before_action :validate_user_is_present, only: :reset_confirm
+  around_action :set_locale, only: :reset_confirm
 
   def reset_confirm
     if @user.reset_password(password_reset_confirm_params[:password], password_reset_confirm_params[:password])
       update_users_password
       render json: { status: :success }
     else
-      render json: { error: 'Password and password confirmation do not match.' }, status: 400
+      errors = @user.errors.to_hash
+      password_invalid = errors[:password]&.pop
+      default_error = I18n.t('users.password_mismatch', locale: :en)
+      message, message_with_locale, code =
+        if password_invalid.present?
+          error = errors[:base]&.pop || default_error
+          [error, password_invalid, 'PASSWORD_INVALID']
+        else
+          [default_error, I18n.t('users.password_mismatch'), 'PASSWORD_MISMATCH']
+        end
+
+      render json: {
+        error: message,
+        error_code: code,
+        error_message: message_with_locale,
+      }, status: 400
     end
   end
 
@@ -22,7 +38,7 @@ class Api::V1::Truth::PasswordsController < Api::BaseController
   private
 
   def validate_user_is_present
-    forbidden unless @user.present?
+    forbidden if @user.blank?
   end
 
   def update_users_password

@@ -16,6 +16,9 @@ AllCops:
   - 'vendor/**/*'
   - 'lib/json_ld/*'
   - 'lib/templates/**/*'
+  - 'lib/proto/*'
+
+  SuggestExtensions: false
 
 Bundler/OrderedGems:
   Enabled: false
@@ -49,6 +52,12 @@ Lint/DeprecatedOpenSSLConstant:
 Lint/DuplicateElsifCondition:
   Enabled: true
 
+Lint/MissingSuper:
+  Exclude:
+    - 'app/services/chat_service.rb'
+    - 'app/services/chat_message_service.rb'
+    - 'app/services/geo_service.rb'
+
 Lint/MixedRegexpCaptureTypes:
   Enabled: true
 
@@ -72,6 +81,7 @@ Metrics/BlockLength:
   Exclude:
     - 'lib/tasks/**/*'
     - 'lib/mastodon/*_cli.rb'
+    - '**/*_spec.rb'
 
 Metrics/BlockNesting:
   Max: 3
@@ -291,6 +301,9 @@ Style/SlicingWithRange:
 
 Style/SymbolArray:
   Enabled: false
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: 'comma'
 
 Style/TrailingCommaInArrayLiteral:
   EnforcedStyleForMultiline: 'comma'

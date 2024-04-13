@@ -37,8 +37,9 @@ RSpec.describe TrendingTags do
     end
 
     it 'calculates and re-calculates scores' do
-      expect(described_class.get(10)).to eq [tag3, tag2, tag1]
+      expect(described_class.get(10)).to eq [tag1, tag3]
       expect(described_class.get(10)).to_not include(tag4)
+      expect(described_class.get(10)).to_not include(tag2)
     end
 
     it 'decays scores' do

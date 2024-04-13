@@ -40,7 +40,24 @@
             </p>
 
             <p class="text-gray-600 mb-0">
-              <%= t 'notification_mailer.user_approved.extra_step' %>
+              <%= t(
+                'notification_mailer.user_approved.extra_step',
+                help_center_link: link_to(
+                  t('notification_mailer.user_approved.help_center'),
+                  'https://help.truthsocial.com',
+                  class: 'text-primary-600',
+                  target: '_blank'
+                ),
+                mailto_support: link_to(
+                  'support@truthsocial.com',
+                  'mailto:support@truthsocial.com',
+                  class: 'text-primary-600',
+                )
+              ).html_safe %>
+            </p>
+
+            <p class="text-gray-600 mb-0">
+              <%= t("notification_mailer.user_approved.signoff") %>
             </p>
 
             <table class="w-full" role="separator" cellpadding="0" cellspacing="0">

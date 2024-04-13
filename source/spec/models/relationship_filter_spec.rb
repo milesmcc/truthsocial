@@ -18,7 +18,7 @@ describe RelationshipFilter do
       end
 
       it 'returns followings ordered by last activity' do
-        expected_result = account.following.eager_load(:account_stat).reorder(nil).by_recent_status
+        expected_result = account.following.eager_load(:account_status).reorder(nil).by_recent_status
 
         expect(subject).to eq expected_result
       end
@@ -27,11 +27,7 @@ describe RelationshipFilter do
 
   def add_following_account_with(last_status_at:)
     following_account = Fabricate(:account)
-    Fabricate(:account_stat, account: following_account,
-                             last_status_at: last_status_at,
-                             statuses_count: 1,
-                             following_count: 0,
-                             followers_count: 0)
+    Fabricate(:status, account: following_account, created_at: last_status_at)
     Fabricate(:follow, account: account, target_account: following_account).account
   end
 end

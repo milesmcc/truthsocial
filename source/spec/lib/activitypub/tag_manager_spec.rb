@@ -10,12 +10,28 @@ RSpec.describe ActivityPub::TagManager do
       account = Fabricate(:account)
       expect(subject.url_for(account)).to be_a String
     end
+
+    it 'returns a group status url' do
+      account = Fabricate(:account)
+      group = Fabricate(:group, display_name: 'Test group', note: 'Note', owner_account: account)
+      group.memberships.create(account: account, role: :owner)
+      status = Status.create!(account: account, text: 'test', group: group, visibility: :group)
+      expect(subject.url_for(status)).to eq "https://#{Rails.configuration.x.web_domain}/group/#{group.slug}/statuses/#{status.id}"
+    end
   end
 
   describe '#uri_for' do
     it 'returns a string' do
       account = Fabricate(:account)
       expect(subject.uri_for(account)).to be_a String
+    end
+
+    it 'returns a group status uri' do
+      account = Fabricate(:account)
+      group = Fabricate(:group, display_name: 'Test group', note: 'Note', owner_account: account)
+      group.memberships.create(account: account, role: :owner)
+      status = Status.create!(account: account, text: 'test', group: group, visibility: :group)
+      expect(subject.uri_for(status)).to eq "https://#{Rails.configuration.x.web_domain}/group/#{group.slug}/statuses/#{status.id}"
     end
   end
 

@@ -5,7 +5,7 @@ class RateLimiter
 
   FAMILIES = {
     follows: {
-      limit: 400,
+      limit: 250,
       period: 24.hours.freeze,
     }.freeze,
 
@@ -23,8 +23,8 @@ class RateLimiter
   def initialize(by, options = {})
     @by     = by
     @family = options[:family]
-    @limit  = FAMILIES[@family][:limit]
-    @period = FAMILIES[@family][:period].to_i
+    @limit  = self.class::FAMILIES[@family][:limit]
+    @period = self.class::FAMILIES[@family][:period].to_i
   end
 
   def record!
@@ -32,16 +32,21 @@ class RateLimiter
 
     if count.nil?
       redis.set(key, 0)
+      count = 0
       redis.expire(key, (@period - (last_epoch_time % @period) + 1).to_i)
     end
 
-    raise Mastodon::RateLimitExceededError, "Rate limit hit by RateLimiter #{@family}" if count.present? && count.to_i >= @limit && ENV['SKIP_IP_RATE_LIMITING'] != 'true'
+    raise error, "Rate limit hit by #{self.class.name} #{@family}" if count.to_i >= @limit && ENV['SKIP_IP_RATE_LIMITING'] != 'true'
 
     redis.incr(key)
   end
 
   def rollback!
     redis.decr(key)
+  end
+
+  def error
+    Mastodon::RateLimitExceededError
   end
 
   def to_headers(now = Time.now.utc)

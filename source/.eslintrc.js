@@ -1,6 +1,10 @@
 module.exports = {
   root: true,
 
+  extends: [
+    'plugin:import/typescript',
+  ],
+
   env: {
     browser: true,
     node: true,
@@ -36,6 +40,7 @@ module.exports = {
     },
     'import/extensions': [
       '.js',
+      '.ts',
     ],
     'import/ignore': [
       'node_modules',
@@ -183,6 +188,7 @@ module.exports = {
       'always',
       {
         js: 'never',
+        ts: 'never',
       },
     ],
     'import/newline-after-import': 'error',

@@ -7,7 +7,7 @@ class Api::OEmbedController < Api::BaseController
   before_action :require_public_status!
 
   def show
-    render json: @status, serializer: OEmbedSerializer, width: maxwidth_or_default, height: maxheight_or_default
+    render json: @status, serializer: OEmbedSerializer, width: maxwidth_or_default, height: maxheight_or_default, has_video: has_video
   end
 
   private
@@ -17,7 +17,11 @@ class Api::OEmbedController < Api::BaseController
   end
 
   def require_public_status!
-    not_found if @status.hidden?
+    not_found if !distributable?
+  end
+
+  def distributable?
+    @status.public_visibility? || @status.unlisted_visibility? || @status.group&.everyone?
   end
 
   def status_finder
@@ -25,10 +29,16 @@ class Api::OEmbedController < Api::BaseController
   end
 
   def maxwidth_or_default
-    (params[:maxwidth].presence || 400).to_i
+    (params[:maxwidth].presence || 600).to_i
   end
 
   def maxheight_or_default
     params[:maxheight].present? ? params[:maxheight].to_i : nil
+  end
+
+  def has_video
+    if @status.with_media?
+      @status.media_attachments.first.video?
+    end
   end
 end

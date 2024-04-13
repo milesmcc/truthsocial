@@ -3,6 +3,8 @@
 class LocalNotificationWorker
   include Sidekiq::Worker
 
+  sidekiq_options retry: 1
+
   def perform(receiver_account_id, activity_id = nil, activity_class_name = nil, type = nil)
     if activity_id.nil? && activity_class_name.nil?
       activity = Mention.find(receiver_account_id)
@@ -13,7 +15,5 @@ class LocalNotificationWorker
     end
 
     NotifyService.new.call(receiver, type || activity_class_name.underscore, activity)
-  rescue ActiveRecord::RecordNotFound
-    true
   end
 end

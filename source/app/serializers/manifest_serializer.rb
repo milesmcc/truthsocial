@@ -68,6 +68,48 @@ class ManifestSerializer < ActiveModel::Serializer
         sizes: '512x512',
         type: 'image/png',
       },
+      {
+        src: '/icons/icon-maskable-48x48.png',
+        sizes: '48x48',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-72x72.png',
+        sizes: '72x72',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-96x96.png',
+        sizes: '96x96',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-128x128.png',
+        sizes: '128x128',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-384x384.png',
+        sizes: '384x384',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/icon-maskable-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
     ]
   end
 

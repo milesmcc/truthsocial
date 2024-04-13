@@ -96,7 +96,7 @@ describe Request do
 
   describe "response's body_with_limit method" do
     it 'rejects body more than 1 megabyte by default' do
-      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(2.megabytes))
+      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(5.megabytes))
       expect { subject.perform { |response| response.body_with_limit } }.to raise_error Mastodon::LengthValidationError
     end
 
@@ -111,12 +111,12 @@ describe Request do
     end
 
     it 'rejects too large chunked body' do
-      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(2.megabytes), headers: { 'Transfer-Encoding' => 'chunked' })
+      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(5.megabytes), headers: { 'Transfer-Encoding' => 'chunked' })
       expect { subject.perform { |response| response.body_with_limit } }.to raise_error Mastodon::LengthValidationError
     end
 
     it 'rejects too large monolithic body' do
-      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(2.megabytes), headers: { 'Content-Length' => 2.megabytes })
+      stub_request(:any, 'http://example.com').to_return(body: SecureRandom.random_bytes(5.megabytes), headers: { 'Content-Length' => 2.megabytes })
       expect { subject.perform { |response| response.body_with_limit } }.to raise_error Mastodon::LengthValidationError
     end
 

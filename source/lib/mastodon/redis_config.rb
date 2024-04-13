@@ -35,9 +35,9 @@ REDIS_CACHE_PARAMS = {
   expires_in: 10.minutes,
   namespace: cache_namespace,
   reconnect_attempts: 1,
-  error_handler: -> (method:, returning:, exception:) {
+  error_handler: ->(method:, returning:, exception:) {
     Rails.logger.error "redis_error | method: #{method}, returning: #{returning}, exception: #{exception}"
-  }
+  },
 }.freeze
 
 REDIS_SIDEKIQ_PARAMS = {

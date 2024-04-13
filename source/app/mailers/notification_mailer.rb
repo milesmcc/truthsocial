@@ -42,9 +42,16 @@ class NotificationMailer < ApplicationMailer
 
     return unless @me.user.functional? && @status.present?
 
+    subject =
+      if notification.count
+        I18n.t('notification_mailer.favourite_group.subject', name: @account.acct, count_others: notification.count - 1, actor: "others")
+      else
+        I18n.t('notification_mailer.favourite.subject', name: @account.acct)
+      end
+
     locale_for_account(@me) do
       thread_by_conversation(@status.conversation)
-      mail to: @me.user.email, subject: I18n.t('notification_mailer.favourite.subject', name: @account.acct)
+      mail to: @me.user.email, subject: subject
     end
   end
 
@@ -103,7 +110,7 @@ class NotificationMailer < ApplicationMailer
     return unless @resource.active_for_authentication?
 
     I18n.with_locale(@resource.locale || I18n.default_locale) do
-      mail to: @resource.email, subject: I18n.t('notification_mailer.user_approved.web.subject')
+      mail to: @resource.email, subject: I18n.t('notification_mailer.user_approved.title', name: @resource.account.username)
     end
   end
 

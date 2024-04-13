@@ -5,7 +5,7 @@ class InvalidateSecondaryCacheService < BaseService
     return unless secondary_dcs
 
     secondary_dcs.split(',').map(&:strip).each do |dc|
-      worker_name.constantize.set(queue: dc).perform_in(1.second, *args)
+      worker_name.constantize.set(queue: dc).perform_async(*args)
     end
   end
 end

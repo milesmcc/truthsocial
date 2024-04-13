@@ -2,6 +2,10 @@ require 'rails_helper'
 
 RSpec.describe CanonicalEmailBlock, type: :model do
   describe '#email=' do
+    before do
+      stub_const('EmailHelper::BASE_EMAIL_DOMAINS_VALIDATION_STRIP_DOTS', 'example.com')
+    end
+
     let(:target_hash) { '973dfe463ec85785f5f95af5ba3906eedb2d931c24e69824a89ea65dba4e813b' }
 
     it 'sets canonical_email_hash' do
@@ -26,6 +30,10 @@ RSpec.describe CanonicalEmailBlock, type: :model do
   end
 
   describe '.block?' do
+    before do
+      stub_const('EmailHelper::BASE_EMAIL_DOMAINS_VALIDATION_STRIP_DOTS',  'bar.com')
+    end
+
     let!(:canonical_email_block) { Fabricate(:canonical_email_block, email: 'foo@bar.com') }
 
     it 'returns true for the same email' do

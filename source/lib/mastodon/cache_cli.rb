@@ -31,7 +31,7 @@ module Mastodon
     def recount(type)
       case type
       when 'accounts'
-        processed, = parallelize_with_progress(Account.local.includes(:account_stat)) do |account|
+        processed, = parallelize_with_progress(Account.local.includes(:account_follower, :account_following, :account_status)) do |account|
           account_stat                 = account.account_stat
           account_stat.following_count = account.active_relationships.count
           account_stat.followers_count = account.passive_relationships.count
@@ -40,7 +40,7 @@ module Mastodon
           account_stat.save if account_stat.changed?
         end
       when 'statuses'
-        processed, = parallelize_with_progress(Status.includes(:status_stat)) do |status|
+        processed, = parallelize_with_progress(Status.includes(:status_favourite, :status_reply, :status_reblog)) do |status|
           status_stat                  = status.status_stat
           status_stat.replies_count    = status.replies.where.not(visibility: :direct).count
           status_stat.reblogs_count    = status.reblogs.count

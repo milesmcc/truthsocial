@@ -7,13 +7,27 @@ RSpec.describe BlockService, type: :service do
 
   describe 'local' do
     let(:bob) { Fabricate(:user, email: 'bob@example.com', account: Fabricate(:account, username: 'bob')).account }
-
+    let(:dalv) { Fabricate(:user, email: 'dalv@example.com', account: Fabricate(:account, username: 'dalv')).account }
+    let(:followed) { Fabricate(:user, email: 'followed@example.com', account: Fabricate(:account, username: 'followed')).account }
+    let(:current_week) {Time.now.strftime('%U').to_i}
     before do
+
+      sender.follow!(followed)
+      Redis.current.zincrby("interactions:#{sender.id}", 10, bob.id)
+      Redis.current.zincrby("interactions:#{sender.id}", 10, dalv.id)
+      Redis.current.zincrby("followers_interactions:#{sender.id}:#{current_week}", 10, followed.id)
+
       subject.call(sender, bob)
+      subject.call(sender, followed)
     end
 
     it 'creates a blocking relation' do
       expect(sender.blocking?(bob)).to be true
+    end
+
+    it 'removes interactions record' do
+      expect(Redis.current.zrange("interactions:#{sender.id}", 0, -1)).to eq [dalv.id.to_s]
+      expect(Redis.current.zrange("followers_interactions:#{sender.id}:#{current_week}", 0, -1)).to eq []
     end
   end
 

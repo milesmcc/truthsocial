@@ -72,16 +72,36 @@ RSpec.describe UnfollowService, type: :service do
 
         UnmergeWorker.perform_one
 
-        expect(Sidekiq::Queues['foo'].size).to eq(2)
-        expect(Sidekiq::Queues['bar'].size).to eq(2)
+        expect(Sidekiq::Queues['foo'].size).to eq(3)
+        expect(Sidekiq::Queues['bar'].size).to eq(3)
         expect(Sidekiq::Queues['foo'].first['class']).to eq(InvalidateFollowCacheWorker.name)
-        expect(Sidekiq::Queues['foo'].second['class']).to eq(UnmergeWorker.name)
+        expect(Sidekiq::Queues['foo'].second['class']).to eq(InvalidateAvatarsCarouselCacheWorker.name)
+        expect(Sidekiq::Queues['foo'].third['class']).to eq(UnmergeWorker.name)
 
         Sidekiq::Worker.drain_all
 
         expect(Sidekiq::Queues['foo'].size).to eq(0)
         expect(Sidekiq::Queues['bar'].size).to eq(0)          
       end
+    end
+  end
+
+  describe 'interactions score' do
+    let(:bob) { Fabricate(:user, email: 'bob@example.com', account: Fabricate(:account, username: 'bob')) }
+    let(:dalv) { Fabricate(:user, email: 'dalv@example.com', account: Fabricate(:account, username: 'dalv')) }
+    let(:current_week) { Time.now.strftime('%U').to_i }
+
+    before do
+      sender.follow!(bob.account)
+      sender.follow!(dalv.account)
+
+      Redis.current.zincrby("followers_interactions:#{sender.id}:#{current_week}", 10, bob.account.id)
+      Redis.current.zincrby("followers_interactions:#{sender.id}:#{current_week}", 10, dalv.account.id)
+      subject.call(sender, dalv.account)
+    end
+
+    it 'removes interactions record' do
+      expect(Redis.current.zrange("followers_interactions:#{sender.id}:#{current_week}", 0, -1)).to eq [bob.account.id.to_s]
     end
   end
 end

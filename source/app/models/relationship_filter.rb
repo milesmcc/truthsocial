@@ -60,13 +60,13 @@ class RelationshipFilter
   def relationship_scope(value)
     case value
     when 'following'
-      account.following.eager_load(:account_stat).reorder(nil)
+      account.following.eager_load(:account_status).reorder(nil)
     when 'followed_by'
-      account.followers.eager_load(:account_stat).reorder(nil)
+      account.followers.eager_load(:account_status).reorder(nil)
     when 'mutual'
-      account.followers.eager_load(:account_stat).reorder(nil).merge(Account.where(id: account.following))
+      account.followers.eager_load(:account_status).reorder(nil).merge(Account.where(id: account.following))
     when 'invited'
-      Account.joins(user: :invite).merge(Invite.where(user: account.user)).eager_load(:account_stat).reorder(nil)
+      Account.joins(user: :invite).merge(Invite.where(user: account.user)).eager_load(:account_status).reorder(nil)
     else
       raise "Unknown relationship: #{value}"
     end
@@ -112,7 +112,7 @@ class RelationshipFilter
   def activity_scope(value)
     case value
     when 'dormant'
-      AccountStat.where(last_status_at: nil).or(AccountStat.where(AccountStat.arel_table[:last_status_at].lt(1.month.ago)))
+      AccountStatusStatistic.where(last_status_at: nil).or(AccountStatusStatistic.where(AccountStatusStatistic.arel_table[:last_status_at].lt(1.month.ago)))
     else
       raise "Unknown activity: #{value}"
     end

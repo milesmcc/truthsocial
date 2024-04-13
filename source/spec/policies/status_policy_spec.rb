@@ -67,6 +67,31 @@ RSpec.describe StatusPolicy, type: :model do
       expect(subject).to permit(alice, status)
     end
 
+    context 'when tv status' do
+      let(:start_time) { Time.now.to_i * 1000 }
+      let(:end_time) { (Time.now.to_i + 3600) * 1000 }
+      let(:program_name) { 'Test program' }
+      let(:image_name) { 'test.jpg' }
+      let(:tv_channel) { Fabricate(:tv_channel) }
+
+      before do
+        tv_channel.update(enabled: true)
+        Fabricate(:tv_channel_account, account: alice, tv_channel: tv_channel)
+        tv_program = TvProgram.create!(channel_id: tv_channel.id, name: program_name, image_url: image_name, start_time:  Time.zone.at(start_time.to_i / 1000).to_datetime, end_time:  Time.zone.at(end_time.to_i / 1000).to_datetime)
+        @tv_status = Fabricate(:status, account: alice, tv_program_status?: true)
+        TvProgramStatus.create!(tv_program: tv_program, tv_channel: tv_channel, status: @tv_status)
+      end
+
+      it 'grants access to tv status when feature flag is enabled for user' do
+        alice.feature_flags.create!(name: 'tv', status: 'account_based')
+        expect(subject).to permit(alice, @tv_status)
+      end
+
+      it 'denies access to tv status when feature flag is not enabled for user' do
+        expect(subject).to_not permit(alice, @tv_status)
+      end
+    end
+
     it 'denies access when private and viewer is not mentioned or followed' do
       viewer = Fabricate(:account)
       status.visibility = :private

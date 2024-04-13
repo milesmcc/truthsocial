@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 class Api::Pleroma::AccountsController < Api::BaseController
+  before_action -> { doorkeeper_authorize! :read }, only: [:mfa, :setup_totp, :backup_codes]
+  before_action -> { doorkeeper_authorize! :write }, only: [:confirm_totp, :delete_totp]
   before_action :require_user!
   before_action :prepare_two_factor, only: [:setup_totp]
   before_action :validate_password, only: [:confirm_totp, :delete_totp]

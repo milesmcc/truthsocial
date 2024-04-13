@@ -21,7 +21,7 @@ class Api::V1::AccountsController < Api::BaseController
   end
 
   def follow
-    follow  = FollowService.new.call(current_user.account, @account, reblogs: params.key?(:reblogs) ? truthy_param?(:reblogs) : nil, notify: params.key?(:notify) ? truthy_param?(:notify) : nil, with_rate_limit: false)
+    follow  = FollowService.new.call(current_user.account, @account, reblogs: params.key?(:reblogs) ? truthy_param?(:reblogs) : nil, notify: params.key?(:notify) ? truthy_param?(:notify) : nil, with_rate_limit: true)
     options = @account.locked? || current_user.account.silenced? ? {} : { following_map: { @account.id => { reblogs: follow.show_reblogs?, notify: follow.notify? } }, requested_map: { @account.id => false } }
     export_prometheus_metric(:follows)
     render json: @account, serializer: REST::RelationshipSerializer, relationships: relationships(**options)
@@ -33,7 +33,7 @@ class Api::V1::AccountsController < Api::BaseController
   end
 
   def mute
-    MuteService.new.call(current_user.account, @account, notifications: truthy_param?(:notifications), duration: (params[:duration]&.to_i || 0))
+    MuteService.new.call(current_user.account, @account, notifications: truthy_param?(:notifications), duration: params.fetch(:duration, 0).to_i)
     render json: @account, serializer: REST::RelationshipSerializer, relationships: relationships
   end
 
@@ -80,7 +80,6 @@ class Api::V1::AccountsController < Api::BaseController
   end
 
   def export_prometheus_metric(metric_to_track)
-    Prometheus::ApplicationExporter::increment(metric_to_track)
+    Prometheus::ApplicationExporter.increment(metric_to_track)
   end
-
 end

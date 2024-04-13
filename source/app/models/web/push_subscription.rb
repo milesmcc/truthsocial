@@ -19,7 +19,7 @@
 
 class Web::PushSubscription < ApplicationRecord
   belongs_to :user, optional: true
-  belongs_to :access_token, class_name: 'Doorkeeper::AccessToken', optional: true
+  belongs_to :access_token, class_name: 'OauthAccessToken', optional: true
 
   has_one :session_activation, foreign_key: 'web_push_subscription_id', inverse_of: :web_push_subscription
 
@@ -74,7 +74,7 @@ class Web::PushSubscription < ApplicationRecord
 
   class << self
     def unsubscribe_for(application_id, resource_owner)
-      access_token_ids = Doorkeeper::AccessToken.where(application_id: application_id, resource_owner_id: resource_owner.id, revoked_at: nil).pluck(:id)
+      access_token_ids = OauthAccessToken.where(application_id: application_id, resource_owner_id: resource_owner.id, revoked_at: nil).pluck(:id)
       where(access_token_id: access_token_ids).delete_all
     end
   end
@@ -82,7 +82,7 @@ class Web::PushSubscription < ApplicationRecord
   private
 
   def find_or_create_access_token
-    Doorkeeper::AccessToken.find_or_create_for(
+    OauthAccessToken.find_or_create_for(
       application: Doorkeeper::Application.find_by(superapp: true),
       resource_owner: user_id || session_activation.user_id,
       scopes: Doorkeeper::OAuth::Scopes.from_string('read write follow push'),

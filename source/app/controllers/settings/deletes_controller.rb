@@ -43,7 +43,9 @@ class Settings::DeletesController < Settings::BaseController
 
   def destroy_account!
     current_account.suspend!(origin: :local)
-    AccountDeletionWorker.perform_async(current_user.account_id)
+    acct_id = current_account.id
+    # Self deletion uses acct_id as the deleted_by_id
+    AccountDeletionWorker.perform_async(acct_id, acct_id, skip_activitypub: true)
     sign_out
   end
 end

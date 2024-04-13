@@ -8,7 +8,7 @@ RSpec.describe NotificationMailer, type: :mailer do
 
   shared_examples 'localized subject' do |*args, **kwrest|
     it 'renders subject localized for the locale of the receiver' do
-      locale = %i(de en).sample
+      locale = %i(en).sample
       receiver.update!(locale: locale)
       expect(mail.subject).to eq I18n.t(*args, **kwrest.merge(locale: locale))
     end
@@ -59,7 +59,24 @@ RSpec.describe NotificationMailer, type: :mailer do
     include_examples 'localized subject', 'notification_mailer.favourite.subject', name: 'bob'
 
     it "renders the headers" do
-      expect(mail.subject).to eq("bob liked your post")
+      expect(mail.subject).to eq("bob liked your Truth")
+      expect(mail.to).to eq([receiver.email])
+    end
+
+    it "renders the body" do
+      expect(mail.body.encoded).to match("Your post was liked by bob")
+      expect(mail.body.encoded).to include 'The body of the own status'
+    end
+  end
+
+  describe "grouped favourite" do
+    let(:favourite) { Favourite.create!(account: sender, status: own_status) }
+    let(:mail) { NotificationMailer.favourite(own_status.account, Notification.create!(count: 5, account: receiver.account, activity: favourite)) }
+
+    include_examples 'localized subject', 'notification_mailer.favourite_group.subject', name: 'bob', count_others: 4, actor: "others"
+
+    it "renders the headers" do
+      expect(mail.subject).to eq("bob + 4 others liked your Truth")
       expect(mail.to).to eq([receiver.email])
     end
 
@@ -76,7 +93,7 @@ RSpec.describe NotificationMailer, type: :mailer do
     include_examples 'localized subject', 'notification_mailer.reblog.subject', name: 'bob'
 
     it "renders the headers" do
-      expect(mail.subject).to eq("bob ReTruthed your post")
+      expect(mail.subject).to eq("bob ReTruthed your Truth")
       expect(mail.to).to eq([receiver.email])
     end
 

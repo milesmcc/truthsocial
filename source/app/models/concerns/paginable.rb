@@ -28,5 +28,11 @@ module Paginable
         paginate_by_max_id(limit, options[:max_id], options[:since_id]).to_a
       end
     end
+
+    def self.paginate_by_limit_offset(limit, params)
+      query = limit(limit)
+      query = query.offset(params[:offset]) if params[:offset].present?
+      query
+    end
   end
 end

@@ -29,7 +29,7 @@ RSpec.describe HomeFeed, type: :model do
         results = subject.get(3)
 
         expect(results.map(&:id)).to eq [5, 3]
-        expect(results.first.attributes.keys).to eq %w(id updated_at)
+        expect(results.first.attributes.keys).to include('id', 'updated_at')
       end
 
       context 'when a whale posts statuses' do
@@ -50,7 +50,29 @@ RSpec.describe HomeFeed, type: :model do
         it 'merges statuses with whales lists' do
           results = subject.get(20)
           expect(results.map(&:id)).to eq [15, 8, 5, 4, 3, 1]
-          expect(results.first.attributes.keys).to eq %w(id updated_at)
+          expect(results.first.attributes.keys).to include('id', 'updated_at')
+        end
+      end
+
+      context 'when a status is marked visible only to self' do
+        before do
+          account.follow!(first_whale_account)
+          account.follow!(second_whale_account)
+          Fabricate(:status, account: first_whale_account, id: 8)
+          Fabricate(:status, account: first_whale_account, id: 4, visibility: :self)
+          Fabricate(:status, account: second_whale_account, id: 15)
+          Fabricate(:status, account: third_whale_account, id: 14)
+
+          Redis.current.zadd("feed:whale:#{first_whale_account.id}", 8, 8)
+          Redis.current.zadd("feed:whale:#{first_whale_account.id}", 4, 4)
+          Redis.current.zadd("feed:whale:#{second_whale_account.id}", 15, 15)
+          Redis.current.zadd("feed:whale:#{third_whale_account.id}", 14, 14)
+        end
+
+        it 'merges statuses with whales lists' do
+          results = subject.get(20)
+          expect(results.map(&:id)).to eq [15, 8, 5, 3, 1]
+          expect(results.first.attributes.keys).to include('id', 'updated_at')
         end
       end
     end

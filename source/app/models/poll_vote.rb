@@ -1,39 +1,24 @@
 # frozen_string_literal: true
 # == Schema Information
 #
-# Table name: poll_votes
+# Table name: polls.votes
 #
-#  id         :bigint(8)        not null, primary key
-#  account_id :bigint(8)
-#  poll_id    :bigint(8)
-#  choice     :integer          default(0), not null
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
-#  uri        :string
+#  poll_id       :integer          not null, primary key
+#  option_number :integer          not null, primary key
+#  account_id    :bigint(8)        not null, primary key
 #
 
 class PollVote < ApplicationRecord
+  self.table_name = 'polls.votes'
+  self.primary_keys = :poll_id, :option_number, :account_id
+
   belongs_to :account
-  belongs_to :poll, inverse_of: :votes
+  belongs_to :poll
 
-  validates :choice, presence: true
+  validates :poll_id, :option_number, :account_id, presence: true
   validates_with VoteValidator
-
-  after_create_commit :increment_counter_cache
-
-  delegate :local?, to: :account
 
   def object_type
     :vote
-  end
-
-  private
-
-  def increment_counter_cache
-    poll.cached_tallies[choice] = (poll.cached_tallies[choice] || 0) + 1
-    poll.save
-  rescue ActiveRecord::StaleObjectError
-    poll.reload
-    retry
   end
 end

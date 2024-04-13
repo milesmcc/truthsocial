@@ -24,11 +24,12 @@
 #  embed_url                    :string           default(""), not null
 #  image_storage_schema_version :integer
 #  blurhash                     :string
+#  file_s3_host                 :string(64)
 #
 
 class PreviewCard < ApplicationRecord
   IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif'].freeze
-  LIMIT = 1.megabytes
+  LIMIT = 2_500.kilobytes
 
   BLURHASH_OPTIONS = {
     x_comp: 4,
@@ -50,9 +51,12 @@ class PreviewCard < ApplicationRecord
   validates_attachment_size :image, less_than: LIMIT
   remotable_attachment :image, LIMIT
 
+  attribute :ad, :boolean, default: false
+
   scope :cached, -> { where.not(image_file_name: [nil, '']) }
 
   before_save :extract_dimensions, if: :link?
+  before_save :set_file_s3_host, if: -> { will_save_change_to_image_file_name? }
 
   def local?
     false
@@ -74,6 +78,7 @@ class PreviewCard < ApplicationRecord
 
     # rubocop:disable Naming/MethodParameterName
     def image_styles(f)
+      return {} if f.instance.ad && f.instance.image_content_type == 'image/gif'
       styles = {
         original: {
           geometry: '800x800>',
@@ -102,5 +107,10 @@ class PreviewCard < ApplicationRecord
 
     self.width  = width
     self.height = height
+  end
+
+
+  def set_file_s3_host
+    self.file_s3_host = Paperclip::Attachment.default_options[:s3_host_name]
   end
 end

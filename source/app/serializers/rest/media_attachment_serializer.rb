@@ -5,14 +5,14 @@ class REST::MediaAttachmentSerializer < ActiveModel::Serializer
 
   attributes :id, :type, :url, :preview_url, :external_video_id,
              :remote_url, :preview_remote_url, :text_url, :meta,
-             :description, :blurhash
+             :description, :blurhash, :tv
 
   def id
     object.id.to_s
   end
 
   def url
-    if object.not_processed?
+    if object.type != 'video' && object.not_processed?
       nil
     elsif object.needs_redownload?
       media_proxy_url(object.id, :original)
@@ -26,8 +26,8 @@ class REST::MediaAttachmentSerializer < ActiveModel::Serializer
   end
 
   def preview_url
-    if object.type == "video"
-      #TODO: replace the image and upload it to CDN
+    if object.type == 'video'
+      # TODO: replace the image and upload it to CDN
       object.external_video_id && object.status.preview_card&.image? ? full_asset_url(object.status.preview_card.image.url(:original)) : full_asset_url('/icons/missing.png')
     elsif object.needs_redownload?
       media_proxy_url(object.id, :small)
@@ -48,5 +48,14 @@ class REST::MediaAttachmentSerializer < ActiveModel::Serializer
 
   def meta
     object.file.meta
+  end
+
+  def external_video_id
+    return nil if object.not_processed?
+    object.external_video_id
+  end
+
+  def tv
+    REST::TvProgramSerializer.new(instance_options[:tv_program]) if instance_options && instance_options[:tv_program]
   end
 end

@@ -30,6 +30,14 @@ RSpec.configure do |config|
   config.before :suite do
     Rails.application.load_seed
     Chewy.strategy(:bypass)
+
+    rmq_url = ENV["RABBITMQ_URL"]
+    if rmq_url.present?
+      mq_connection = Bunny.new(rmq_url)
+      mq_connection.start
+      event_channel = mq_connection.create_channel
+      event_channel.topic("ha.truth_events", durable: true)
+    end
   end
 
   config.after :suite do

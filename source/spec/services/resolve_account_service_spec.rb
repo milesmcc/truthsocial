@@ -11,6 +11,7 @@ RSpec.describe ResolveAccountService, type: :service do
     stub_request(:get, "https://ap.example.com/users/foo.atom").to_return(request_fixture('activitypub-feed.txt'))
     stub_request(:get, %r{https://ap.example.com/users/foo/\w+}).to_return(status: 404)
     stub_request(:get, 'https://example.com/.well-known/webfinger?resource=acct:hoge@example.com').to_return(status: 410)
+    allow_any_instance_of(Request).to receive(:private_address?).and_return(false)
   end
 
   context 'using skip_webfinger' do
