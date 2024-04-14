@@ -2,7 +2,7 @@
 
 This repository contains an automatically updated dump of Truth Social's source code (reskinned Mastodon). Everything is in the [`source`](/source) folder.
 
-Because Truth Social is reskinned [Mastodon](https://en.wikipedia.org/wiki/Mastodon_(software)), Truth Social is legally required under the GPL to release their source code. They don't make it easy to browse, though. This repository changes that.
+Because Truth Social is reskinned [Mastodon](https://en.wikipedia.org/wiki/Mastodon_(software)), Truth Social is legally required under the AGPL to release their source code. They don't make it easy to browse, though. This repository changes that.
 
 Future improvements:
 
