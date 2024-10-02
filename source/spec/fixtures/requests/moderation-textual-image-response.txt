@@ -1,0 +1,285 @@
+{
+  "id": "4b37b110-3674-11ec-b293-531b71b5e9db",
+    "code": 200,
+    "project_id": 30458,
+    "user_id": 4762,
+    "created_on": "2021-10-26T15:49:25.217Z",
+    "status": [
+    {
+      "status": {
+        "code": "0",
+        "message": "SUCCESS"
+
+      },
+      "response": {
+        "input": {
+          "id": "4b37b110-3674-11ec-b293-531b71b5e9db",
+          "charge": 0.003,
+          "model": "moderation38_dense_zzz",
+          "model_version": 1,
+          "model_type": "CATEGORIZATION",
+          "created_on": "2021-10-26T15:49:24.769Z",
+          "media": {
+            "url": "http://4.bp.blogspot.com/_V8yGCBzzgzk/Sm-SDKgiIVI/AAAAAAAAAa0/HPSY3Q8B45A/w1200-h630-p-k-no-nu/dirty+texts1.jpg",
+            "filename": null,
+            "type": "PHOTO",
+            "mime_type": "jpeg",
+            "mimetype": "image/jpeg",
+            "width": 758,
+            "height": 630,
+            "num_frames": 1,
+            "duration": 0
+
+          },
+          "user_id": 4762,
+          "project_id": 30458,
+          "config_version": 1,
+          "config_tag": "default"
+
+        },
+        "output": [
+        {
+          "time": 0,
+          "classes": [
+          {
+            "class": "general_not_nsfw_not_suggestive",
+            "score": 0.9999962554956109
+
+          },
+          {
+            "class": "general_nsfw",
+            "score": 0.000003588279660315881
+
+          },
+          {
+            "class": "general_suggestive",
+            "score": 1.5622472877574626e-7
+
+          },
+          {
+            "class": "no_female_underwear",
+            "score": 0.9999999942900102
+
+          },
+          {
+            "class": "yes_female_underwear",
+            "score": 5.709989856674378e-9
+
+          },
+          {
+            "class": "no_male_underwear",
+            "score": 0.9999996761245159
+
+          },
+          {
+            "class": "yes_male_underwear",
+            "score": 3.238754840279521e-7
+
+          },
+          {
+            "class": "no_sex_toy",
+            "score": 0.9999999372205032
+
+          },
+          {
+            "class": "yes_sex_toy",
+            "score": 6.277949683314089e-8
+
+          },
+          {
+            "class": "no_female_nudity",
+            "score": 0.9999999097048881
+
+          },
+          {
+            "class": "yes_female_nudity",
+            "score": 9.02951119589841e-8
+
+          },
+          {
+            "class": "no_male_nudity",
+            "score": 0.9999999903267943
+
+          },
+          {
+            "class": "yes_male_nudity",
+            "score": 9.673205735364348e-9
+
+          },
+          {
+            "class": "no_female_swimwear",
+            "score": 0.9999999976252274
+
+          },
+          {
+            "class": "yes_female_swimwear",
+            "score": 2.3747727040457186e-9
+
+          },
+          {
+            "class": "no_male_shirtless",
+            "score": 0.9999999436811197
+
+          },
+          {
+            "class": "yes_male_shirtless",
+            "score": 5.631888048906423e-8
+
+          },
+          {
+            "class": "no_text",
+            "score": 0.001503818758124884
+
+          },
+          {
+            "class": "text",
+            "score": 0.998496181241875
+
+          },
+          {
+            "class": "animated",
+            "score": 0.9954575239581814
+
+          },
+          {
+            "class": "hybrid",
+            "score": 0.0009650618646311348
+
+          },
+          {
+            "class": "natural",
+            "score": 0.0035774141771875365
+
+          },
+          {
+            "class": "animated_gun",
+            "score": 0.00002013730609598776
+
+          },
+          {
+            "class": "gun_in_hand",
+            "score": 1.1042148436917299e-8
+
+          },
+          {
+            "class": "gun_not_in_hand",
+            "score": 1.1118208552369811e-8
+
+          },
+          {
+            "class": "no_gun",
+            "score": 0.9999798405335469
+
+          },
+          {
+            "class": "culinary_knife_in_hand",
+            "score": 5.429679647297932e-11
+
+          },
+          {
+            "class": "knife_in_hand",
+            "score": 1.0647823071662086e-8
+
+          },
+          {
+            "class": "knife_not_in_hand",
+            "score": 0.000004019838544593226
+
+          },
+          {
+            "class": "no_knife",
+            "score": 0.9999959694593356
+
+          },
+          {
+            "class": "a_little_bloody",
+            "score": 0.0000014245231158514663
+
+          },
+          {
+            "class": "no_blood",
+            "score": 0.9999921745750416
+
+          },
+          {
+            "class": "other_blood",
+            "score": 0.000006330173878026762
+
+          },
+          {
+            "class": "very_bloody",
+            "score": 7.07279643986403e-8
+
+          },
+          {
+            "class": "no_pills",
+            "score": 0.9999999810901105
+
+          },
+          {
+            "class": "yes_pills",
+            "score": 1.8909889477742977e-8
+
+          },
+          {
+            "class": "no_smoking",
+            "score": 0.9999998813188823
+
+          },
+          {
+            "class": "yes_smoking",
+            "score": 1.1868111779755404e-7
+
+          },
+          {
+            "class": "illicit_injectables",
+            "score": 9.073695176889685e-8
+
+          },
+          {
+            "class": "medical_injectables",
+            "score": 2.8728337351306616e-8
+
+          },
+          {
+            "class": "no_injectables",
+            "score": 0.9999998805347109
+
+          },
+          {
+            "class": "no_nazi",
+            "score": 0.9999998304170333
+
+          },
+          {
+            "class": "yes_nazi",
+            "score": 1.6958296660456789e-7
+
+          },
+          {
+            "class": "no_kkk",
+            "score": 0.9999999989833819
+
+          },
+          {
+            "class": "yes_kkk",
+            "score": 1.016618158210925e-9
+
+          },
+          {
+            "class": "no_middle_finger",
+            "score": 0.9999990378568762
+
+          },
+          {
+            "class": "yes_middle_finger",
+            "score": 9.62143123797171e-7
+
+          }
+          ]
+        }
+        ]
+      }
+    }
+  ]
+}

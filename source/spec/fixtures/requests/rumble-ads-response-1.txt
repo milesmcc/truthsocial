@@ -1,0 +1,75 @@
+{
+   "count": 3,
+   "ads": [{
+         "type": 1,
+         "impression": "//domain.com/i?tid=test&cf=abcd",
+         "click": "//domain.com/click11",
+         "asset": "//cdn.domain.com/asset11",
+         "expires": 1
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/i?tid=test&cf=abcd",
+         "click": "//domain.com/click12",
+         "asset": "//cdn.domain.com/asset12",
+         "expires": 2
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/i?tid=test&cf=abcd",
+         "click": "//domain.com/click13",
+         "asset": "//cdn.domain.com/asset13",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/i?tid=test&cf=abcd",
+         "click": "//domain.com/click14",
+         "asset": "//cdn.domain.com/asset14",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr15",
+         "click": "//domain.com/click15",
+         "asset": "//cdn.domain.com/asset15",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr16",
+         "click": "//domain.com/click16",
+         "asset": "//cdn.domain.com/asset16",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr17",
+         "click": "//domain.com/click17",
+         "asset": "//cdn.domain.com/asset17",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr18",
+         "click": "//domain.com/click18",
+         "asset": "//cdn.domain.com/asset18",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr19",
+         "click": "//domain.com/click19",
+         "asset": "//cdn.domain.com/asset19",
+         "expires": 3
+      },
+      {
+         "type": 1,
+         "impression": "//domain.com/impr110",
+         "click": "//domain.com/click110",
+         "asset": "//cdn.domain.com/asset110",
+         "expires": 3
+      }
+
+   ]
+}
