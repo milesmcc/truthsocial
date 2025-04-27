@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class StatusesIndex < Chewy::Index
-  settings index: { refresh_interval: '15m' }, number_of_shards: '12', analysis: {
+  settings index: { refresh_interval: '1m' }, number_of_shards: '12', analysis: {
     filter: {
       english_stop: {
         type: 'stop',
@@ -31,22 +31,22 @@ class StatusesIndex < Chewy::Index
     },
   }
 
-  define_type ::Status.unscoped.kept.without_reblogs.includes(:status_stat) do
+  index_scope ::Status.unscoped.kept.without_reblogs.includes(:status_favourite, :status_reply, :status_reblog)
 
-    root date_detection: false do
-      field :id, type: 'long'
-      field :account_id, type: 'long'
+  root date_detection: false do
+    field :id, type: 'long'
+    field :account_id, type: 'long'
 
-      field :text, type: 'text', value: ->(status) {
-        [status.spoiler_text, Formatter.instance.plaintext(status)].reject(&:blank?).join("\n\n")
-      } do
-        field :stemmed, type: 'text', analyzer: 'content'
-      end
-
-      field :activity, type: 'integer', value: ->(status) { (status.reblogs_count * 3) + status.favourites_count }
-
-      field :created_at, type: 'date'
+    field :text, type: 'text', value: ->(status) {
+      [status.spoiler_text, Formatter.instance.plaintext(status)].reject(&:blank?).join("\n\n")
+    } do
+      field :stemmed, type: 'text', analyzer: 'content'
     end
-  end
 
+    field :activity, type: 'integer', value: ->(status) { (status.reblogs_count * 3) + status.favourites_count }
+
+    field :created_at, type: 'date'
+
+    field :text_hash, type: 'keyword'
+  end
 end

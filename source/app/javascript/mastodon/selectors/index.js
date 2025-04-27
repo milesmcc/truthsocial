@@ -3,12 +3,11 @@ import { List as ImmutableList, Map as ImmutableMap, is } from 'immutable';
 import { me } from '../initial_state';
 
 const getAccountBase         = (state, id) => state.getIn(['accounts', id], null);
-const getAccountCounters     = (state, id) => state.getIn(['accounts_counters', id], null);
 const getAccountRelationship = (state, id) => state.getIn(['relationships', id], null);
 const getAccountMoved        = (state, id) => state.getIn(['accounts', state.getIn(['accounts', id, 'moved'])]);
 
 export const makeGetAccount = () => {
-  return createSelector([getAccountBase, getAccountCounters, getAccountRelationship, getAccountMoved], (base, counters, relationship, moved) => {
+  return createSelector([getAccountBase, getAccountRelationship, getAccountMoved], (base, counters, relationship, moved) => {
     if (base === null) {
       return null;
     }

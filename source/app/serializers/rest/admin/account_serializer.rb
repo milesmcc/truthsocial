@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 class REST::Admin::AccountSerializer < ActiveModel::Serializer
-  attributes :id, :username, :domain, :created_at,
+  attributes :id, :username, :domain, :created_at, :deleted,
              :email, :ip, :role, :confirmed, :suspended,
              :silenced, :disabled, :approved, :locale,
-             :invite_request, :verified, :location, :website
+             :invite_request, :verified, :location, :website, :sms, :sms_reverification_required, :updated_at, :advertiser
 
   attribute :created_by_application_id, if: :created_by_application?
   attribute :invited_by_account_id, if: :invited?
@@ -21,8 +21,16 @@ class REST::Admin::AccountSerializer < ActiveModel::Serializer
 
   delegate :website, to: :object
 
+  def deleted
+    object.deleted?
+  end
+
   def email
     object.user_email
+  end
+
+  def sms
+    object.user_sms
   end
 
   def ip
@@ -79,5 +87,17 @@ class REST::Admin::AccountSerializer < ActiveModel::Serializer
 
   def created_by_application?
     object.user&.created_by_application_id&.present?
+  end
+
+  def sms_reverification_required
+    !!object.user&.user_sms_reverification_required&.user_id
+  end
+
+  def updated_at
+    object.updated_at
+  end
+
+  def advertiser
+    !!object.recent_ads.presence
   end
 end

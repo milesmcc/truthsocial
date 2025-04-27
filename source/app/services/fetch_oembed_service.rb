@@ -5,6 +5,17 @@ class FetchOEmbedService
 
   attr_reader :url, :options, :format, :endpoint_url
 
+  #
+  # Calls the service with a given URL and options.
+  # If the options hash contains a `:cached_endpoint`, it will parse the cached endpoint.
+  # Otherwise, it will discover the endpoint by fetching the HTML of the page and looking
+  # for OEmbed links in the head of the document.  After the endpoint is determined, it fetches
+  # the OEmbed data from the endpoint URL.
+  #
+  # @param url [String] the URL to fetch OEmbed data from
+  # @param options [Hash] a hash of options. Can contain a `:cached_endpoint` key with a cached endpoint to use.
+  # @return [Hash, nil] the fetched OEmbed data, or nil if an error occurred
+  #
   def call(url, options = {})
     @url     = url
     @options = options

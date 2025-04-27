@@ -10,8 +10,25 @@ describe AccountSearchService, type: :service do
         expect(results).to eq [account]
       end
 
+      it "won't return an exact match if followers: true and if match is not following the account" do
+        Fabricate(:account, username: 'match')
+        account = Fabricate(:account, username: 'john')
+
+        results = subject.call('@match', account, followers: true, limit: 10)
+        expect(results).to eq []
+      end
+
+      it "won't return a match if the account is not accepting chat messages" do
+        account1 = Fabricate(:account, username: 'match', accepting_messages: false)
+        account2 = Fabricate(:account, username: 'john')
+        account1.follow!(account2)
+
+        results = subject.call('match', account2, followers: true, limit: 10)
+        expect(results).to eq []
+      end
+
       it 'do not return non-matches' do
-        account = Fabricate(:account, username: 'notevenclose')
+        Fabricate(:account, username: 'notevenclose')
 
         results = subject.call('@match', nil, limit: 10)
         expect(results).to eq []

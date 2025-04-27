@@ -3,7 +3,6 @@
 #
 # Table name: users
 #
-#  id                        :bigint(8)        not null, primary key
 #  email                     :string           default(""), not null
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
@@ -31,6 +30,7 @@
 #  otp_backup_codes          :string           is an Array
 #  filtered_languages        :string           default([]), not null, is an Array
 #  account_id                :bigint(8)        not null
+#  id                        :bigint(8)        not null, primary key
 #  disabled                  :boolean          default(FALSE), not null
 #  moderator                 :boolean          default(FALSE), not null
 #  invite_id                 :bigint(8)
@@ -46,12 +46,16 @@
 #  waitlist_position         :integer
 #  unsubscribe_from_emails   :boolean          default(FALSE)
 #  ready_to_approve          :integer          default("not_ready_for_approval")
-#  unauth_visibility         :boolean
+#  unauth_visibility         :boolean          default(TRUE), not null
+#  policy_id                 :bigint(8)
+#  sign_up_city_id           :integer          not null
+#  sign_up_country_id        :integer          not null
 #
 
 class User < ApplicationRecord
   include Settings::Extend
   include UserRoles
+  include EmailHelper
 
   # The home and list feeds will be stored in Redis for this amount
   # of time, and status fan-out to followers will include only people
@@ -61,7 +65,15 @@ class User < ApplicationRecord
   # RegenerationWorker jobs that need to be run when those people come
   # to check their feed
   ACTIVE_DURATION = ENV.fetch('USER_ACTIVE_DAYS', 7).to_i.days.freeze
-  WAITLIST_PADDING = ENV.fetch('WAITLIST_PADDING', 50000).to_i
+  WAITLIST_PADDING = ENV.fetch('WAITLIST_PADDING', 50_000).to_i
+  BASE_EMAIL_DOMAINS_VALIDATION = ENV.fetch('BASE_EMAIL_DOMAINS_VALIDATION', false)
+  VERIFICATION_INTERVAL = 1.hour.ago.freeze
+  INTEGRITY_STATUSES = {
+    favourite: 'favourite',
+    status: 'status',
+    chat_message: 'chat_message',
+    reblog: 'reblog',
+  }.freeze
 
   devise :two_factor_authenticatable,
          otp_secret_encryption_key: Rails.configuration.x.otp_secret
@@ -79,6 +91,9 @@ class User < ApplicationRecord
   belongs_to :account, inverse_of: :user
   belongs_to :invite, counter_cache: :uses, optional: true
   belongs_to :created_by_application, class_name: 'Doorkeeper::Application', optional: true
+  belongs_to :policy, optional: true
+  belongs_to :city, class_name: 'City', foreign_key: 'sign_up_city_id', optional: true
+  belongs_to :country, class_name: 'Country', foreign_key: 'sign_up_country_id', optional: true
   accepts_nested_attributes_for :account
 
   has_many :applications, class_name: 'Doorkeeper::Application', as: :owner
@@ -86,15 +101,16 @@ class User < ApplicationRecord
   has_many :invites, inverse_of: :user
   has_many :markers, inverse_of: :user, dependent: :destroy
   has_many :webauthn_credentials, dependent: :destroy
+  has_many :one_time_challenges, dependent: :destroy
+  has_many :password_histories, class_name: 'PasswordHistory'
 
   has_one :invite_request, class_name: 'UserInviteRequest', inverse_of: :user, dependent: :destroy
-  has_one :trending
+  has_one :user_current_information
   accepts_nested_attributes_for :invite_request, reject_if: ->(attributes) { attributes['text'].blank? && !Setting.require_invite_text }
   validates :invite_request, presence: true, on: :create, if: :invite_text_required?
 
   validates :locale, inclusion: I18n.available_locales.map(&:to_s), if: :locale?
   validates_with BlacklistedEmailValidator, on: :create
-  validates_with EmailMxValidator, if: :validate_email_dns?
   validates :agreement, acceptance: { allow_nil: false, accept: [true, 'true', '1'] }, on: :create
 
   # Those are honeypot/antispam fields
@@ -102,7 +118,10 @@ class User < ApplicationRecord
 
   validates_with RegistrationFormTimeValidator, on: :create
   validates :website, absence: true, on: :create
+  validates :password, unique_password: true
   validates :confirm_password, absence: true, on: :create
+
+  validates_with BaseEmailValidator, on: :create
 
   scope :recent, -> { order(id: :desc) }
   scope :pending, -> { where(approved: false) }
@@ -122,6 +141,8 @@ class User < ApplicationRecord
   before_create :skip_confirmation_if_invited
   after_commit :send_pending_devise_notifications
   after_update_commit :send_approved_notification
+  after_create :create_base_email
+  after_save :store_password_history
 
   # This avoids a deprecation warning from Rails 5.1
   # It seems possible that a future release of devise-two-factor will
@@ -129,6 +150,11 @@ class User < ApplicationRecord
   attribute :otp_secret
 
   has_many :session_activations, dependent: :destroy
+
+  has_one :user_base_email
+
+  has_one :user_sms_reverification_required
+  scope :with_reverification, -> { eager_load(:user_sms_reverification_required) }
 
   delegate :auto_play_gif, :default_sensitive, :unfollow_modal, :boost_modal, :delete_modal,
            :reduce_motion, :system_font_ui, :noindex, :theme, :display_media, :hide_network,
@@ -141,7 +167,7 @@ class User < ApplicationRecord
   attr_writer :external, :bypass_invite_request_check
 
   enum ready_to_approve: { not_ready_for_approval: 0, ready_by_csv_import: 1, ready_by_sms_verification: 2, sent_one_push_notification: 3, sent_two_push_notifications: 4, sent_three_push_notifications: 5 }
-  self.ignored_columns = ["reviewed_for_approval"]
+  self.ignored_columns = ['reviewed_for_approval']
 
   def confirmed?
     confirmed_at.present?
@@ -185,7 +211,7 @@ class User < ApplicationRecord
   end
 
   def confirm!
-    new_user      = !confirmed?
+    new_user = !confirmed?
 
     skip_confirmation!
     save!
@@ -209,12 +235,6 @@ class User < ApplicationRecord
     if new_sign_in
       self.sign_in_count ||= 0
       self.sign_in_count  += 1
-    else
-      query = if old_current_sign_in.nil?
-                query.where('current_sign_in_at' => nil)
-              else
-                query.where('current_sign_in_at < :time', time: UserTrackingConcern::UPDATE_SIGN_IN_HOURS.hours.ago)
-              end
     end
 
     unless new_record?
@@ -224,6 +244,17 @@ class User < ApplicationRecord
                        current_sign_in_ip: current_sign_in_ip,
                        sign_in_count: sign_in_count)
     end
+
+    UserCurrentInformation.upsert(
+      user_id: id,
+      current_sign_in_at: new_current_sign_in,
+      current_sign_in_ip: new_current_ip,
+      current_city_id: geo(request).city,
+      current_country_id: geo(request).country
+    )
+
+    EventProvider::EventProvider.new('session.updated', SessionUpdatedEvent, { user_id: id, account_id: account_id, ip_address: new_current_ip, timestamp: new_current_sign_in }).call
+
     prepare_returning_user!
   end
 
@@ -232,13 +263,13 @@ class User < ApplicationRecord
   end
 
   def self.get_user_from_token(user_token)
-    id, _updated_at_s = EncryptAttrService.decrypt(user_token).split("+=")
+    id, _updated_at_s = EncryptAttrService.decrypt(user_token).split('+=')
 
     find_by(id: id)
   end
 
   def validate_user_token(user_token)
-    _id, updated_at_s = EncryptAttrService.decrypt(user_token).split("+=")
+    _id, updated_at_s = EncryptAttrService.decrypt(user_token).split('+=')
 
     updated_at.to_s == updated_at_s
   end
@@ -249,6 +280,23 @@ class User < ApplicationRecord
 
   def sms_verified?
     sms.present?
+  end
+
+  # remove once all devices have completed the force update
+  def integrity_score
+    return 0 unless ActiveModel::Type::Boolean.new.cast(ENV.fetch('PLAY_INTEGRITY_ENABLED', true)) # Enable/Disable app integrity for all users
+
+    last_status_at = AccountStatusStatistic.find_by(account_id: account.id)&.last_status_at
+    first_status_today = last_status_at ? last_status_at < Time.zone.now.midnight : true
+    first_status_today ? 1 : 0
+  end
+
+  def integrity_status(token, android_client)
+    return [] unless android_client
+    return [] unless user_sms_reverification_required
+
+    integrity_credential = token.integrity_credentials.order(last_verified_at: :desc).first
+    integrity_credential&.last_verified_at&.send(:>, VERIFICATION_INTERVAL) ? [] : INTEGRITY_STATUSES.values
   end
 
   def active_for_authentication?
@@ -288,15 +336,13 @@ class User < ApplicationRecord
   end
 
   def two_factor_enabled?
-    otp_required_for_login? || webauthn_credentials.any?
+    otp_required_for_login?
   end
 
   def disable_two_factor!
     self.otp_required_for_login = false
     self.otp_secret = nil
     otp_backup_codes&.clear
-
-    webauthn_credentials.destroy_all if webauthn_enabled?
 
     save!
   end
@@ -305,7 +351,7 @@ class User < ApplicationRecord
     return 0 if approved?
 
     most_recent_user = User.pending.order(waitlist_position: :desc).first
-    position = most_recent_user&.waitlist_position || 11342 # this is a magic number means nothing could be anything
+    position = most_recent_user&.waitlist_position || 11_342 # this is a magic number means nothing could be anything
     self.waitlist_position = position + 1
 
     save!
@@ -357,7 +403,7 @@ class User < ApplicationRecord
   # rubocop:disable Naming/MethodParameterName
   def token_for_app(a)
     return nil if a.nil? || a.owner != self
-    Doorkeeper::AccessToken.find_or_create_by(application_id: a.id, resource_owner_id: id) do |t|
+    OauthAccessToken.find_or_create_by(application_id: a.id, resource_owner_id: id) do |t|
       t.scopes = a.scopes
       t.expires_in = Doorkeeper.configuration.access_token_expires_in
       t.use_refresh_token = Doorkeeper.configuration.refresh_token_enabled?
@@ -456,6 +502,10 @@ class User < ApplicationRecord
     nil
   end
 
+  def sms_country
+    Phonelib.parse(sms).country
+  end
+
   protected
 
   def send_devise_notification(notification, *args, **kwargs)
@@ -540,7 +590,7 @@ class User < ApplicationRecord
 
   def prepare_returning_user!
     ActivityTracker.record('activity:logins', id)
-    regenerate_feed! if needs_feed_update?
+    clear_feeds! if needs_feed_update?
   end
 
   def notify_staff_about_pending_account!
@@ -552,6 +602,13 @@ class User < ApplicationRecord
 
   def regenerate_feed!
     RegenerationWorker.perform_async(account_id) if Redis.current.set("account:#{account_id}:regeneration", true, nx: true, ex: 1.day.seconds)
+  end
+
+  def clear_feeds!
+    home_feed = HomeFeed.new(account)
+    home_feed.clear!
+    groups_feed = GroupsFeed.new(account)
+    groups_feed.clear!
   end
 
   def needs_feed_update?
@@ -573,16 +630,40 @@ class User < ApplicationRecord
   end
 
   def hourly_limit_reached?
-    key = "approved_users_per_hour:#{DateTime.current.strftime("%Y-%m-%d:%H:00")}"
+    key = "approved_users_per_hour:#{DateTime.current.strftime('%Y-%m-%d:%H:00')}"
     return unless (limit_per_hour = ENV['USERS_PER_HOUR'].to_i) > 0
     current_limit = Redis.current.scard(key)
     current_limit.present? && current_limit.to_i >= limit_per_hour
   end
 
   def track_approved_user
-    key = "approved_users_per_hour:#{DateTime.current.strftime("%Y-%m-%d:%H:00")}"
+    key = "approved_users_per_hour:#{DateTime.current.strftime('%Y-%m-%d:%H:00')}"
     Redis.current.sadd(key, id)
     Redis.current.expire(key, 65.minutes.seconds)
-    Prometheus::ApplicationExporter::increment(:approves)
+    Prometheus::ApplicationExporter.increment(:approves)
+  end
+
+  def geo(request)
+    @geo_object ||= GeoService.new(
+      city_name: request.headers['Geoip-City-Name'],
+      country_code: request.headers['Geoip-Country-Code'],
+      country_name: request.headers['Geoip-Country-Name'],
+      region_name: request.headers['Geoip-Region-Name'],
+      region_code: request.headers['Geoip-Region-Code']
+    )
+  end
+
+  def create_base_email
+    return unless BASE_EMAIL_DOMAINS_VALIDATION
+
+    username, domain = email_to_canonical_email_by_username_and_domain(email).values_at(:username, :domain)
+
+    return unless BASE_EMAIL_DOMAINS_VALIDATION.split(',').map(&:strip).include? domain
+
+    UserBaseEmail.create(user_id: id, email: "#{username}@#{domain}")
+  end
+
+  def store_password_history
+    PasswordHistory.create!(user: self, encrypted_password: encrypted_password) if saved_change_to_encrypted_password?
   end
 end

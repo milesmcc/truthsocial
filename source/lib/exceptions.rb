@@ -19,6 +19,18 @@ module Mastodon
 
   class RateLimitExceededError < Error; end
 
+  class HostileRateLimitExceededError < Error; end
+
+  class UnprocessableEntityError < Error; end
+
+  class UnprocessableAssertion < Error; end
+
+  class AttestationError < Error; end
+
+  class ReceiptVerificationError < Error; end
+
+  class RumbleVideoUploadError < Error; end
+
   class UnexpectedResponseError < Error
     attr_reader :response
 
@@ -32,4 +44,18 @@ module Mastodon
       end
     end
   end
+end
+
+module Tv
+  class Error < StandardError; end
+
+  class LoginError < Error; end
+
+  class SignUpError < Error; end
+
+  class MissingAccountError < Error; end
+
+  class MissingSessionError < Error; end
+
+  class GetProfilesError < Error; end
 end

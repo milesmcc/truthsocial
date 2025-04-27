@@ -14,9 +14,8 @@ class NoteLengthValidator < ActiveModel::EachValidator
   def countable_text(value)
     return '' if value.nil?
 
-    value.dup.tap do |new_text|
-      new_text.gsub!(FetchLinkCardService::URL_PATTERN, StatusLengthValidator::URL_PLACEHOLDER)
-      new_text.gsub!(Account::MENTION_RE, '@\2')
-    end
+    value
+      .gsub(FetchLinkCardService::URL_PATTERN) { |url| URLPlaceholder.generate(url) }
+      .gsub(Account::MENTION_RE, '@\2')
   end
 end

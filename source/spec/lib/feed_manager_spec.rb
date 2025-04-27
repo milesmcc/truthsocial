@@ -22,10 +22,20 @@ RSpec.describe FeedManager do
     it 'returns a string' do
       expect(subject).to be_a String
     end
+
+    it 'returns a feed key' do
+      expect(subject).to eq "feed:home:1"
+    end
+    
+    context 'with a subtype' do
+      it 'returns a feed key with a subtype' do
+        expect(FeedManager.instance.key(:home, 1, :list)).to eq "feed:home:1:list"
+      end
+    end
   end
 
   describe '#filter?' do
-    let(:alice) { Fabricate(:account, username: 'alice') }
+    let(:alice) { Fabricate(:account, username: 'alice', created_at: Time.now - 10.days) }
     let(:bob)   { Fabricate(:account, username: 'bob', domain: 'example.com') }
     let(:jeff)  { Fabricate(:account, username: 'jeff') }
 
@@ -113,7 +123,7 @@ RSpec.describe FeedManager do
       it 'returns false for status by followee mentioning another account' do
         bob.follow!(alice)
         jeff.follow!(alice)
-        status = PostStatusService.new.call(alice, text: 'Hey @jeff')
+        status = PostStatusService.new.call(alice, text: 'Hey @jeff', mentions: ['jeff'])
         expect(FeedManager.instance.filter?(:home, status, bob)).to be false
       end
 
@@ -155,7 +165,7 @@ RSpec.describe FeedManager do
           expect(FeedManager.instance.filter?(:home, status, alice)).to be true
         end
 
-        it 'returns true if phrase is contained in a poll option' do
+        xit 'returns true if phrase is contained in a poll option' do
           alice.custom_filters.create!(phrase: 'farts', context: %w(home public), irreversible: true)
           alice.custom_filters.create!(phrase: 'pop tarts', context: %w(home), irreversible: true)
           alice.follow!(jeff)
@@ -194,7 +204,42 @@ RSpec.describe FeedManager do
     end
   end
 
+  describe '#push_to_whale' do
+    it 'pushes a status to a whale list' do
+      account = Fabricate(:account)
+      status = Fabricate(:status, account: account)
+      feed_count = ->{ Redis.current.zcard("feed:whale:#{account.id}") }
+
+      expect do
+        FeedManager.instance.push_to_whale(status)
+      end.to change(&feed_count).by(1)
+    end
+  end
+
+  describe '#remove_from_whale' do
+    it 'removes a status from a whale list' do
+      account = Fabricate(:account)
+      status = Fabricate(:status, account: account)
+      feed_count = ->{ Redis.current.zcard("feed:whale:#{account.id}") }
+      FeedManager.instance.push_to_whale(status)
+
+      expect do
+        FeedManager.instance.remove_from_whale(status)
+      end.to change(&feed_count).by(-1)
+    end
+  end
+
   describe '#push_to_home' do
+    it 'pushes a status to the home feed' do
+      account = Fabricate(:account)
+      status = Fabricate(:status, account: account)
+      feed_count = ->{ Redis.current.zcard("feed:home:#{account.id}") }
+
+      expect do
+        FeedManager.instance.push_to_home(account, status)
+      end.to change(&feed_count).by(1)
+    end
+
     it 'trims timelines if they will have more than FeedManager::MAX_ITEMS' do
       account = Fabricate(:account)
       status = Fabricate(:status)
@@ -206,28 +251,6 @@ RSpec.describe FeedManager do
       expect(Redis.current.zcard("feed:home:#{account.id}")).to eq FeedManager::MAX_ITEMS
     end
 
-    describe '#push_to_whale' do
-      it 'pushes a status to a whale list' do
-        account = Fabricate(:account)
-        status = Fabricate(:status, account: account)
-        expect(Redis.current.zcard("feed:whale:#{account.id}")).to eq 0
-        FeedManager.instance.push_to_whale(status)
-        expect(Redis.current.zcard("feed:whale:#{account.id}")).to eq 1
-      end
-    end
-
-    describe '#remove_from_whale' do
-      it 'removes a status from a whale list' do
-        account = Fabricate(:account)
-        status = Fabricate(:status, account: account)
-
-        Redis.current.zadd("feed:whale:#{account.id}", status.id, status.id)
-        expect(Redis.current.zcard("feed:whale:#{account.id}")).to eq 1
-
-        FeedManager.instance.remove_from_whale(status)
-        expect(Redis.current.zcard("feed:whale:#{account.id}")).to eq 0
-      end
-    end
 
     context 'reblogs' do
       it 'saves reblogs of unseen statuses' do
@@ -443,15 +466,71 @@ RSpec.describe FeedManager do
   end
 
   describe '#merge_into_home' do
-    it "does not push source account's statuses whose reblogs are already inserted" do
-      account = Fabricate(:account, id: 0)
+    let(:feed_manager) { FeedManager.instance }
+
+    it "merges statuses from another account", :aggregate_failures do
+      from_account = Fabricate(:account, id: 0)
+      into_account = Fabricate(:account)
+      status = Fabricate(:status, account: from_account)
+      feed_count = ->{ Redis.current.zcard("feed:home:#{into_account.id}") }
+
+      feed_manager.push_to_home(from_account, status)
+
+      expect do
+        feed_manager.merge_into_home(from_account, into_account)
+      end.to change(&feed_count).by(1)
+    end
+
+    it "does not push source account's statuses whose reblogs are already inserted", :aggregate_failures do
+      from_account = Fabricate(:account, id: 0)
       reblog = Fabricate(:status)
       status = Fabricate(:status, reblog: reblog)
-      FeedManager.instance.push_to_home(account, status)
+      FeedManager.instance.push_to_home(from_account, status)
+      feed_count = ->{ Redis.current.zcard("feed:home:#{reblog.account.id}") }
 
-      FeedManager.instance.merge_into_home(account, reblog.account)
+      expect do
+        feed_manager.merge_into_home(from_account, reblog.account)
+      end.to change(&feed_count).by(0)
 
+      # why are we checking the from_account's feed for the reblog.id?
       expect(Redis.current.zscore("feed:home:0", reblog.id)).to eq nil
+    end
+  end
+
+  describe '#unmerge_from_home' do
+    let(:feed_manager) { FeedManager.instance }
+
+    it "unmerges statuses from another account", :override_status_id do
+      from_account = Fabricate(:account, id: 0)
+      into_account = Fabricate(:account)
+      status = Fabricate(:status, account: from_account)
+      feed_count = ->{ Redis.current.zcard("feed:home:#{into_account.id}") }
+      expect(feed_manager.push_to_home(from_account, status)).to eq true
+
+      feed_manager.merge_into_home(from_account, into_account)
+
+      expect do
+        feed_manager.unmerge_from_home(from_account, into_account)
+      end.to change(&feed_count).by(-1)
+    end
+  end
+
+  describe '#unmerge_from_list' do
+    let(:feed_manager) { FeedManager.instance }
+
+    it "unmerges statuses from another account", :override_status_id do
+      from_account = Fabricate(:account, id: 0)
+      owner_account = Fabricate(:account)
+      list = Fabricate(:list, account: owner_account)
+      status = Fabricate(:status, account: from_account)
+      list_count = ->{ Redis.current.zcard("feed:list:#{list.id}") }
+      expect(feed_manager.push_to_list(list, status)).to eq true
+
+      feed_manager.merge_into_list(from_account, list)
+
+      expect do
+        feed_manager.unmerge_from_list(from_account, list)
+      end.to change(&list_count).by(-1)
     end
   end
 

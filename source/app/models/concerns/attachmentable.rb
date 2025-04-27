@@ -20,10 +20,10 @@ module Attachmentable
   ).freeze
 
   included do
-    before_post_process :obfuscate_file_name
-    before_post_process :set_file_extensions
-    before_post_process :check_image_dimensions
-    before_post_process :set_file_content_type
+    before_validation :obfuscate_file_name
+    before_validation :set_file_extensions
+    before_validation :check_image_dimensions
+    before_validation :set_file_content_type
   end
 
   private

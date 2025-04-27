@@ -2,24 +2,17 @@
 
 class AccountSuggestions
   SOURCES = [
-    AccountSuggestions::SettingSource,
-    AccountSuggestions::PastInteractionsSource,
-    AccountSuggestions::GlobalSource,
+    {klass: AccountSuggestions::SettingSource, limit: 300},
+    {klass: AccountSuggestions::PastInteractionsSource, limit: 25},
+    {klass: AccountSuggestions::GlobalSource, limit: 25}
   ].freeze
 
-  # Since we iterate through 3 arrays, this number is the max # of suggestions that will be returned
-  # Ex: if the total limit is 120 and the client requests 5 at a time, the total # of pages that can be returned is 24
-  TOTAL_RESULTS_LIMIT = 150
-
-  # The total limit divided by the # of sources
-  ARRAY_LIMIT = TOTAL_RESULTS_LIMIT / SOURCES.length.floor
-
   def self.get(account)
-    SOURCES.each_with_object([]) do |source_class, suggestions|
-      source_suggestions = source_class.new.get(
+    SOURCES.each_with_object([]) do |obj, suggestions|
+      source_suggestions = obj[:klass].new.get(
         account,
         skip_account_ids: suggestions.map(&:account_id),
-        limit: ARRAY_LIMIT
+        limit: obj[:limit]
       )
 
       suggestions.concat(source_suggestions)
@@ -27,8 +20,8 @@ class AccountSuggestions
   end
 
   def self.remove(account, target_account_id)
-    SOURCES.each do |source_class|
-      source = source_class.new
+    SOURCES.each do |obj|
+      source = obj[:klass].new
       source.remove(account, target_account_id)
     end
   end

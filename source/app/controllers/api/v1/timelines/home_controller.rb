@@ -6,14 +6,23 @@ class Api::V1::Timelines::HomeController < Api::BaseController
   after_action :insert_pagination_headers, unless: -> { @statuses.empty? }
 
   def show
-    @statuses  = load_statuses
+    @statuses = load_statuses
     account_ids = @statuses.filter(&:quote?).map { |status| status.quote.account_id }.uniq
 
-    render json: @statuses,
-           each_serializer: REST::StatusSerializer,
-           relationships: StatusRelationshipsPresenter.new(@statuses, current_user&.account_id),
-           account_relationships: AccountRelationshipsPresenter.new(account_ids, current_user&.account_id),
-           status: account_home_feed.regenerating? ? 206 : 200
+    if (ad_indexes = ENV.fetch('X_TRUTH_AD_INDEXES', nil))
+      response.headers['x-truth-ad-indexes'] = ad_indexes
+    end
+
+    render json: Panko::ArraySerializer.new(
+      @statuses,
+      each_serializer: REST::V2::StatusSerializer,
+      context: {
+        current_user: current_user,
+        relationships: StatusRelationshipsPresenter.new(@statuses, current_user&.account_id),
+        account_relationships: AccountRelationshipsPresenter.new(account_ids, current_user&.account_id),
+        status: account_home_feed.regenerating? ? 206 : 200,
+      }
+    ).to_json
   end
 
   private

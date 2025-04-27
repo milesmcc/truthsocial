@@ -1,24 +1,36 @@
+# frozen_string_literal: true
 class PostDistributionService < BaseService
   include Redisable
 
   BAILEY_PERCENTAGE = (ENV['BAILEY_PERCENTAGE'] || "0").to_i
 
-  def call(status)
-    if rand(1..100) <= BAILEY_PERCENTAGE  && !status.account.whale?
-      send_to_bailey(status)
+  # Enqueue jobs for both author and followers
+  def distribute_to_author(status)
+    if rand(1..100) <= BAILEY_PERCENTAGE
+      QueueManager.enqueue_status_for_author_distribution(status.id)
+      Rails.logger.debug("bailey_debug: enqueuing status #{status.id}")
     else
       FanOutOnWriteService.new.call(status)
     end
   end
 
-  def send_to_bailey(status)
-    if status.account.silenced? || !status.public_visibility? || status.reblog?
-      rendered = nil
+  def distribute_to_followers(status)
+    if rand(1..100) <= BAILEY_PERCENTAGE
+      QueueManager.enqueue_status_for_follower_distribution(status.id)
+      Rails.logger.debug("bailey_debug: enqueuing status #{status.id}")
     else
-      rendered = InlineRenderer.render(status, nil, :status)
-      rendered = Oj.dump(event: :update, payload: rendered)
+      FanOutOnWriteService.new.call(status)
     end
-    Redis.current.lpush('elixir:distribution', Oj.dump(job_type: "status_created", status_id: status.id, rendered: rendered))
-    Rails.logger.debug("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status.id}")
   end
+
+  def distribute_to_author_and_followers(status)
+    if rand(1..100) <= BAILEY_PERCENTAGE
+      QueueManager.enqueue_status_for_author_distribution(status.id)
+      QueueManager.enqueue_status_for_follower_distribution(status.id)
+      Rails.logger.debug("bailey_debug: enqueuing status #{status.id}")
+    else
+      FanOutOnWriteService.new.call(status)
+    end
+  end
+
 end

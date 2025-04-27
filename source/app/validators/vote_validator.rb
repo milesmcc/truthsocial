@@ -6,7 +6,7 @@ class VoteValidator < ActiveModel::Validator
 
     vote.errors.add(:base, I18n.t('polls.errors.invalid_choice')) if invalid_choice?(vote)
 
-    if vote.poll.multiple? && vote.poll.votes.where(account: vote.account, choice: vote.choice).exists?
+    if vote.poll.multiple? && vote.poll.votes.where(account: vote.account, option_number: vote.option_number).exists?
       vote.errors.add(:base, I18n.t('polls.errors.already_voted'))
     elsif !vote.poll.multiple? && vote.poll.votes.where(account: vote.account).exists?
       vote.errors.add(:base, I18n.t('polls.errors.already_voted'))
@@ -16,6 +16,6 @@ class VoteValidator < ActiveModel::Validator
   private
 
   def invalid_choice?(vote)
-    vote.choice.negative? || vote.choice >= vote.poll.options.size
+    vote.option_number.negative? || vote.option_number >= vote.poll.options.size
   end
 end

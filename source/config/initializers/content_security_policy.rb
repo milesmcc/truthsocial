@@ -19,8 +19,8 @@ media_host ||= assets_host
 #TODO: refactor the maintenance of these URLs
 segment_base_url = 'https://cdn.segment.com'
 segment_api_url = 'https://api.segment.io'
-segment_script_hashes = ["'sha256-Kru1cRFDRjvkSX3GJVOzPMlesOJPlwl8Yf/vyxi7wnc='", 
-                         "'sha256-SkDGcKd1lxidykiwp0MQl3em4R4qTUyDCyVbFr52Qdo='", 
+segment_script_hashes = ["'sha256-Kru1cRFDRjvkSX3GJVOzPMlesOJPlwl8Yf/vyxi7wnc='",
+                         "'sha256-SkDGcKd1lxidykiwp0MQl3em4R4qTUyDCyVbFr52Qdo='",
                          "'sha256-CZKu4Ofm+PztnJbExQzfZGKk50F7ttkRpdQxduN4lCA='"
                         ]
 
@@ -59,14 +59,3 @@ end
 Rails.application.config.content_security_policy_nonce_generator = -> request { SecureRandom.base64(16) }
 
 Rails.application.config.content_security_policy_nonce_directives = %w(style-src)
-
-Rails.application.reloader.to_prepare do
-  PgHero::HomeController.content_security_policy do |p|
-    p.script_src :self, :unsafe_inline, assets_host
-    p.style_src  :self, :unsafe_inline, assets_host
-  end
-
-  PgHero::HomeController.after_action do
-    request.content_security_policy_nonce_generator = nil
-  end
-end

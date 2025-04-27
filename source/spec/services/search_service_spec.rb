@@ -5,6 +5,12 @@ require 'rails_helper'
 describe SearchService, type: :service do
   subject { described_class.new }
 
+  describe '#create_query' do
+    it 'strips emojis' do
+      expect(subject.create_query("Rock on \u{1f918}")).to eq("Rock on")
+    end
+  end
+
   describe '#call' do
     describe 'with a blank query' do
       it 'returns empty results without searching' do
@@ -46,6 +52,18 @@ describe SearchService, type: :service do
         end
       end
 
+      context 'that finds a group' do
+        it 'includes the group in the results' do
+          group = Group.new
+          service = double(call: group)
+          allow(ResolveURLService).to receive(:new).and_return(service)
+
+          results = subject.call(@query, nil, 10, resolve: true)
+          expect(service).to have_received(:call).with(@query, on_behalf_of: nil)
+          expect(results).to eq empty_results.merge(groups: [group])
+        end
+      end
+
       context 'that finds a status' do
         it 'includes the status in the results' do
           status = Status.new
@@ -75,13 +93,13 @@ describe SearchService, type: :service do
 
       context 'that matches a tag' do
         it 'includes the tag in the results' do
-          query = '#tag'
-          tag = Tag.new
-          allow(Tag).to receive(:search_for).with('tag', 10, 0, exclude_unreviewed: nil).and_return([tag])
+          query = 'tag'
+          tag = [{url: "URL", name: "tag", history: [{day: "1679270400", uses: "0", accounts: "0", days_ago: 0}, {day: "1679184000", uses: "0", accounts: "0", days_ago: 1}, {day: "1679097600", uses: "0", accounts: "0", days_ago: 2}]}].to_json
+          allow(Tag).to receive(:search_for).with('tag', 10, 0).and_return(tag)
 
           results = subject.call(query, nil, 10)
-          expect(Tag).to have_received(:search_for).with('tag', 10, 0, exclude_unreviewed: nil)
-          expect(results).to eq empty_results.merge(hashtags: [tag])
+          expect(Tag).to have_received(:search_for).with('tag', 10, 0)
+          expect(results).to eq empty_results.merge(hashtags: JSON.parse(tag))
         end
         it 'does not include tag when starts with @ character' do
           query = '@username'
@@ -104,6 +122,6 @@ describe SearchService, type: :service do
   end
 
   def empty_results
-    { accounts: [], hashtags: [], statuses: [] }
+    { accounts: [], hashtags: [], statuses: [], groups: [] }
   end
 end

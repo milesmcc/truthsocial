@@ -8,7 +8,7 @@ RSpec.describe BatchedRemoveStatusService, type: :service do
   let!(:jeff)   { Fabricate(:user).account }
   let!(:hank)   { Fabricate(:account, username: 'hank', protocol: :activitypub, domain: 'example.com', inbox_url: 'http://example.com/inbox') }
 
-  let(:status1) { PostStatusService.new.call(alice, text: 'Hello @bob@example.com') }
+  let(:status1) { PostStatusService.new.call(alice, text: 'Hello @bob@example.com', mentions: ['bob']) }
   let(:status2) { PostStatusService.new.call(alice, text: 'Another status') }
 
   before do
@@ -26,6 +26,8 @@ RSpec.describe BatchedRemoveStatusService, type: :service do
 
     status1
     status2
+
+    PostDistributionService.new.distribute_to_author_and_followers(status1)
 
     subject.call([status1, status2])
   end

@@ -39,8 +39,6 @@ module TwoFactorAuthenticationConcern
 
     if user.present? && session[:attempt_user_id].present? && session[:attempt_user_updated_at] != user.updated_at.to_s
       restart_session
-    elsif user.webauthn_enabled? && user_params.key?(:credential) && session[:attempt_user_id]
-      authenticate_with_two_factor_via_webauthn(user)
     elsif user_params.key?(:otp_attempt) && session[:attempt_user_id]
       authenticate_with_two_factor_via_otp(user)
     elsif user.present? && user.external_or_valid_password?(user_params[:password])

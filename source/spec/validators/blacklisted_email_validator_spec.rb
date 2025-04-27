@@ -10,6 +10,7 @@ RSpec.describe BlacklistedEmailValidator, type: :validator do
     before do
       allow(user).to receive(:valid_invitation?) { false }
       allow_any_instance_of(described_class).to receive(:blocked_email_provider?) { blocked_email }
+      stub_const('EmailHelper::BASE_EMAIL_DOMAINS_VALIDATION_STRIP_DOTS', 'mail.com')
     end
 
     subject { described_class.new.validate(user); errors }

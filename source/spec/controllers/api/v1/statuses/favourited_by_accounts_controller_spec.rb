@@ -25,7 +25,7 @@ RSpec.describe Api::V1::Statuses::FavouritedByAccountsController, type: :control
       it 'returns http success' do
         get :index, params: { status_id: status.id, limit: 2 }
         expect(response).to have_http_status(200)
-        expect(response.headers['Link'].links.size).to eq(2)
+        expect(response.headers['Link'].links.size).to eq(1)
       end
 
       it 'returns accounts who favorited the status' do

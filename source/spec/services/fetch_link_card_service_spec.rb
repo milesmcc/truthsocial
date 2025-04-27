@@ -13,17 +13,19 @@ RSpec.describe FetchLinkCardService, type: :service do
     stub_request(:get, 'http://example.com/test-').to_return(request_fixture('idn.txt'))
     stub_request(:get, 'http://example.com/windows-1251').to_return(request_fixture('windows-1251.txt'))
     stub_request(:get, "https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ").to_return(status: 200)
+    stub_request(:get, "https://#{ENV.fetch('LOCAL_DOMAIN')}/groups/test-group").to_return(status: 200)
 
   end
 
   context 'in a local status' do
 
     before do
+      allow(::Resolv).to receive(:getaddress).and_return('111.111.111.111')
       subject.call(status)
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out http://example.中国') }
+      let(:status) { Fabricate(:status, text: 'Check out http://example.中国', visibility: :public) }
 
       it 'works with IDN URLs' do
         expect(a_request(:get, 'http://example.xn--fiqs8s/')).to have_been_made.at_least_once
@@ -31,7 +33,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis') }
+      let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis', visibility: :public) }
 
       it 'works with SJIS' do
         expect(a_request(:get, 'http://example.com/sjis')).to have_been_made.at_least_once
@@ -40,7 +42,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis_with_wrong_charset') }
+      let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis_with_wrong_charset', visibility: :public) }
 
       it 'works with SJIS even with wrong charset header' do
         expect(a_request(:get, 'http://example.com/sjis_with_wrong_charset')).to have_been_made.at_least_once
@@ -49,7 +51,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out http://example.com/koi8-r') }
+      let(:status) { Fabricate(:status, text: 'Check out http://example.com/koi8-r', visibility: :public) }
 
       it 'works with koi8-r' do
         expect(a_request(:get, 'http://example.com/koi8-r')).to have_been_made.at_least_once
@@ -58,7 +60,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out http://example.com/windows-1251') }
+      let(:status) { Fabricate(:status, text: 'Check out http://example.com/windows-1251', visibility: :public) }
 
       it 'works with windows-1251' do
         expect(a_request(:get, 'http://example.com/windows-1251')).to have_been_made.at_least_once
@@ -67,7 +69,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'テストhttp://example.com/日本語') }
+      let(:status) { Fabricate(:status, text: 'テストhttp://example.com/日本語', visibility: :public) }
 
       it 'works with Japanese path string' do
         expect(a_request(:get, 'http://example.com/日本語')).to have_been_made.at_least_once
@@ -76,7 +78,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'test http://example.com/test-') }
+      let(:status) { Fabricate(:status, text: 'test http://example.com/test-', visibility: :public) }
 
       it 'works with a URL ending with a hyphen' do
         expect(a_request(:get, 'http://example.com/test-')).to have_been_made.at_least_once
@@ -84,7 +86,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'testhttp://example.com/sjis') }
+      let(:status) { Fabricate(:status, text: 'testhttp://example.com/sjis', visibility: :public) }
 
       it 'does not fetch URLs with not isolated from their surroundings' do
         expect(a_request(:get, 'http://example.com/sjis')).to_not have_been_made
@@ -92,7 +94,7 @@ RSpec.describe FetchLinkCardService, type: :service do
     end
 
     context do
-      let(:status) { Fabricate(:status, text: 'Check out https://youtu.be/dQw4w9WgXcQ?t=5') }
+      let(:status) { Fabricate(:status, text: 'Check out https://youtu.be/dQw4w9WgXcQ?t=5', visibility: :public) }
 
       it 'converts youtube short links to proper URL' do
         expect(a_request(:get, 'https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ')).to have_been_made.at_least_once
@@ -102,7 +104,7 @@ RSpec.describe FetchLinkCardService, type: :service do
   end
 
   context 'in a remote status' do
-    let(:status) { Fabricate(:status, account: Fabricate(:account, domain: 'example.com'), text: 'Habt ihr ein paar gute Links zu <a>foo</a> #<span class="tag"><a href="https://quitter.se/tag/wannacry" target="_blank" rel="tag noopener noreferrer" title="https://quitter.se/tag/wannacry">Wannacry</a></span> herumfliegen?   Ich will mal unter <br> <a href="https://github.com/qbi/WannaCry" target="_blank" rel="noopener noreferrer" title="https://github.com/qbi/WannaCry">https://github.com/qbi/WannaCry</a> was sammeln. !<a href="http://sn.jonkman.ca/group/416/id" target="_blank" rel="noopener noreferrer" title="http://sn.jonkman.ca/group/416/id">security</a>&nbsp;') }
+    let(:status) { Fabricate(:status, account: Fabricate(:account, domain: 'example.com'), text: 'Habt ihr ein paar gute Links zu <a>foo</a> #<span class="tag"><a href="https://quitter.se/tag/wannacry" target="_blank" rel="tag noopener noreferrer" title="https://quitter.se/tag/wannacry">Wannacry</a></span> herumfliegen?   Ich will mal unter <br> <a href="https://github.com/qbi/WannaCry" target="_blank" rel="noopener noreferrer" title="https://github.com/qbi/WannaCry">https://github.com/qbi/WannaCry</a> was sammeln. !<a href="http://sn.jonkman.ca/group/416/id" target="_blank" rel="noopener noreferrer" title="http://sn.jonkman.ca/group/416/id">security</a>&nbsp;', visibility: :public) }
 
     before do
       subject.call(status)
@@ -118,7 +120,7 @@ RSpec.describe FetchLinkCardService, type: :service do
   end
 
   context 'secondary datacenters' do
-    let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis') }
+    let(:status) { Fabricate(:status, text: 'Check out http://example.com/sjis', visibility: :public) }
 
     before do
       allow(ENV).to receive(:fetch).with('SECONDARY_DCS', false).and_return('foo,bar')
@@ -135,6 +137,21 @@ RSpec.describe FetchLinkCardService, type: :service do
 
         expect(Sidekiq::Queues['foo'].size).to eq(1)
         expect(Sidekiq::Queues['bar'].size).to eq(1)
+      end
+    end
+  end
+
+  context 'with a group' do
+    before do
+      Group.create!(display_name: 'Test Group', note: 'Note', statuses_visibility: :everyone, owner_account: Fabricate(:account))
+      subject.call(status, nil, ENV.fetch('LOCAL_DOMAIN'))
+    end
+
+    context do
+      let(:status) { Fabricate(:status, text: "Check out https://#{ENV.fetch('LOCAL_DOMAIN')}/group/test-group", visibility: :public) }
+
+      it 'creates a preview card from a group' do
+        expect(status.preview_cards.first.title).to eq('Test Group')
       end
     end
   end

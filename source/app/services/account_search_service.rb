@@ -17,7 +17,8 @@ class AccountSearchService < BaseService
   private
 
   def search_service_results
-    return [] if query.blank? || limit < 1
+    return [] if limit < 1
+    return [] if query.blank? && !options[:followers]
 
     [exact_match] + search_results
   end
@@ -30,6 +31,7 @@ class AccountSearchService < BaseService
     match = Account.find_local(query)
 
     match = nil if !match.nil? && !account.nil? && options[:following] && !account.following?(match)
+    match = nil if options[:followers] && !match&.following?(account)
 
     @exact_match = match
   end
@@ -38,7 +40,7 @@ class AccountSearchService < BaseService
     return [] if limit_for_non_exact_results.zero?
 
     @search_results ||= begin
-      results = from_elasticsearch if Chewy.enabled?
+      results = from_elasticsearch if Chewy.enabled? && !options[:followers]
       results ||= from_database
       results
     end
@@ -57,14 +59,20 @@ class AccountSearchService < BaseService
   end
 
   def advanced_search_results
-    Account.advanced_search_for(query, account, limit_for_non_exact_results, options[:following], offset)
+    Account.advanced_search_for(query, account, limit, options[:following], offset)
   end
 
   def follower_search
-    account.followers.where('LOWER(username) LIKE ?', '%' + query.downcase + '%').limit(20)
+    account
+      .followers_unordered
+      .where('LOWER(username) LIKE :search OR LOWER(display_name) LIKE :search', search: "%#{sanitize_search(query&.downcase)}%")
+      .where(accepting_messages: true)
+      .limit(limit)
+      .offset(offset)
+      .order(username: :asc)
   end
 
-  def fields    
+  def fields
     if likely_username?
       %w(acct.edge_ngram acct)
     elsif likely_display_name?
@@ -89,14 +97,23 @@ class AccountSearchService < BaseService
 
     functions = [reputation_score_function, followers_score_function, time_distance_function]
 
-    records = AccountsIndex.query(function_score: { query: fields_query, functions: functions, boost_mode: 'multiply', score_mode: 'multiply' })
+    records = AccountsIndex.query(
+      function_score: {
+        query: fields_query,
+        functions: functions,
+        boost_mode: 'multiply',
+        score_mode: 'multiply',
+      }
+    )
                            .filter(SearchService::PROHIBITED_FILTERS)
+                           .filter(term: { suspended: false })
+                           .filter(exists: { field: 'email' })
                            .limit(limit_for_non_exact_results)
                            .offset(offset)
                            .objects
                            .compact
 
-    ActiveRecord::Associations::Preloader.new.preload(records, :account_stat)
+    ActiveRecord::Associations::Preloader.new.preload(records, [:account_follower, :account_following, :account_status, :tv_channel_account, :moved_to_account])
 
     records
   rescue Faraday::ConnectionFailed, Parslet::ParseFailed
@@ -168,4 +185,7 @@ class AccountSearchService < BaseService
     @acct_hint
   end
 
+  def sanitize_search(query)
+    ActiveRecord::Base.sanitize_sql_like(query || '')
+  end
 end

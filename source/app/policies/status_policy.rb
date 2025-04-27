@@ -14,10 +14,14 @@ class StatusPolicy < ApplicationPolicy
   def show?
     return false if author.suspended?
 
-    if requires_mention?
+    if group?
+      owned? || public_group? || private_group_member?
+    elsif requires_mention?
       owned? || mention_exists?
     elsif private?
       owned? || following_author? || mention_exists?
+    elsif tv?
+      current_account.tv_enabled?
     else
       current_account.nil? || (!author_blocking? && !author_blocking_domain?)
     end
@@ -51,8 +55,16 @@ class StatusPolicy < ApplicationPolicy
     author.id == current_account&.id
   end
 
+  def group?
+    record.group_visibility?
+  end
+
   def private?
     record.private_visibility?
+  end
+
+  def tv?
+    !!record.tv_program
   end
 
   def mention_exists?
@@ -87,6 +99,22 @@ class StatusPolicy < ApplicationPolicy
     return false if current_account.nil?
 
     @preloaded_relations[:following] ? @preloaded_relations[:following][author.id] : current_account.following?(author)
+  end
+
+  def public_group?
+    record.group.everyone?
+  end
+
+  def private_group_member?
+    return false unless record.group.members_only?
+
+    group_member?
+  end
+
+  def group_member?
+    return false if current_account.nil? || record.group_id.nil?
+
+    record.group.members.where(id: current_account&.id).exists?
   end
 
   def author

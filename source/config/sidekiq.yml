@@ -7,6 +7,9 @@
   - [mailers, 2]
   - [pull]
   - [chewy]
+  - [removal]
+  - [reblog-removal]
+  - [shared]
 :scheduler:
   :listened_queues_only: true
 :schedule:
@@ -14,17 +17,9 @@
     every: '5m'
     class: Scheduler::ScheduledStatusesScheduler
     queue: scheduler
-  trending_tags_scheduler:
-    every: '5m'
-    class: Scheduler::TrendingTagsScheduler
-    queue: scheduler
   media_cleanup_scheduler:
     cron: '<%= Random.rand(0..59) %> <%= Random.rand(3..5) %> * * *'
     class: Scheduler::MediaCleanupScheduler
-    queue: scheduler
-  feed_cleanup_scheduler:
-    cron: '<%= Random.rand(0..59) %> <%= Random.rand(0..2) %> * * *'
-    class: Scheduler::FeedCleanupScheduler
     queue: scheduler
   follow_recommendations_scheduler:
     cron: '<%= Random.rand(0..59) %> <%= Random.rand(6..9) %> * * *'
@@ -46,10 +41,6 @@
     cron: '<%= Random.rand(0..59) %> <%= Random.rand(3..5) %> * * *'
     class: Scheduler::BackupCleanupScheduler
     queue: scheduler
-  pghero_scheduler:
-    cron: '0 0 * * *'
-    class: Scheduler::PgheroScheduler
-    queue: scheduler
   instance_refresh_scheduler:
     cron: '0 * * * *'
     class: Scheduler::InstanceRefreshScheduler
@@ -57,4 +48,20 @@
   users_approval_scheduler:
     every: '5m'
     class: Scheduler::UsersApprovalScheduler
+    queue: scheduler
+  refresh_receipt_scheduler:
+    cron: '0 0 * * *'
+    class: Scheduler::RefreshReceiptScheduler
+    queue: scheduler
+  tv_create_program_records_scheduler:
+    every: '10m'
+    class: Scheduler::TvCreateProgramRecordsScheduler
+    queue: scheduler
+  tv_refetch_channels_list_scheduler:
+    cron: '0 1 * * *'
+    class: Scheduler::TvRefetchChannelsListScheduler
+    queue: scheduler
+  device_verification_cleanup_scheduler:
+    cron: '0 2 * * *'
+    class: Scheduler::DeviceVerificationCleanupWorker
     queue: scheduler

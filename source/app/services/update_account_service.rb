@@ -1,6 +1,4 @@
 # frozen_string_literal: true
-require "./lib/proto/serializers/account_updated_event.rb"
-
 class UpdateAccountService < BaseService
   def call(account, params, raise_error: false)
     was_locked    = account.locked
@@ -8,6 +6,7 @@ class UpdateAccountService < BaseService
 
     params['settings_store'] = params['pleroma_settings_store']
     params.delete('pleroma_settings_store')
+    params.delete('chats_onboarded')
 
     if !params['settings_store']
       params.delete('settings_store')
@@ -16,12 +15,15 @@ class UpdateAccountService < BaseService
     account.send(update_method, params).tap do |ret|
       next unless ret
 
+      # Allow resetting header images by passing in empty string
+      if params[:header] && params[:header].to_s.empty?
+        account.header_file_name = nil
+        account.header_content_type = nil
+        account.header_file_size = nil
+      end
+
       authorize_all_follow_requests(account) if was_locked && !account.locked
       check_links(account)
-      Redis.current.publish(
-        AccountUpdatedEvent::EVENT_KEY,
-        AccountUpdatedEvent.new(account, fields_changed(account)).serialize
-      )
       process_hashtags(account)
     end
   rescue Mastodon::DimensionsValidationError, Mastodon::StreamValidationError => e
@@ -45,14 +47,5 @@ class UpdateAccountService < BaseService
 
   def process_hashtags(account)
     account.tags_as_strings = Extractor.extract_hashtags(account.note)
-  end
-
-  def fields_changed(account)
-    updatable_fields = %w(display_name avatar_url header_url website bio location)
-    changed_fields = account.saved_changes.keys
-    updated_fields = changed_fields.select { |f| updatable_fields.include?(f) }
-    updated_fields << "avatar_url" if changed_fields.include?("avatar_file_name")
-    updated_fields << "header_url" if changed_fields.include?("header_file_name")
-    updated_fields.map(&:upcase)
   end
 end

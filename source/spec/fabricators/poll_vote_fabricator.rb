@@ -1,5 +1,5 @@
 Fabricator(:poll_vote) do
   account
   poll
-  choice  0
+  option_number  0
 end

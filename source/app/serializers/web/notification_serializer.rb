@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Web::NotificationSerializer < ActiveModel::Serializer
+class Web::NotificationSerializer < NotificationSerializer
   include RoutingHelper
   include ActionView::Helpers::TextHelper
   include ActionView::Helpers::SanitizeHelper
@@ -29,7 +29,7 @@ class Web::NotificationSerializer < ActiveModel::Serializer
   end
 
   def title
-    I18n.t("notification_mailer.#{object.type}.subject", name: object.from_account.display_name.presence || object.from_account.username)
+    I18n.t("notification_mailer.#{template}.subject", mailer_params)
   end
 
   def body

@@ -17,20 +17,23 @@ class Api::V1::Statuses::FavouritedByAccountsController < Api::BaseController
   def load_accounts
     scope = default_accounts
     scope = scope.where.not(id: current_account.excluded_from_timeline_account_ids) unless current_account.nil?
-    scope.merge(paginated_favourites).to_a
+    scope = scope.merge(paginated_favourites).to_a
+    @size = scope.size
+
+    @size > limit_param(DEFAULT_ACCOUNTS_LIMIT) ? scope.drop(1) : scope
   end
 
   def default_accounts
     Account
       .without_suspended
-      .includes(:favourites, :account_stat)
+      .includes(:favourites, :account_follower, :account_following, :account_status)
       .references(:favourites)
       .where(favourites: { status_id: @status.id })
   end
 
   def paginated_favourites
     Favourite.paginate_by_max_id(
-      limit_param(DEFAULT_ACCOUNTS_LIMIT),
+      limit_param(DEFAULT_ACCOUNTS_LIMIT) + 1,
       params[:max_id],
       params[:since_id]
     )
@@ -61,7 +64,7 @@ class Api::V1::Statuses::FavouritedByAccountsController < Api::BaseController
   end
 
   def records_continue?
-    @accounts.size == limit_param(DEFAULT_ACCOUNTS_LIMIT)
+    @size > limit_param(DEFAULT_ACCOUNTS_LIMIT)
   end
 
   def set_status

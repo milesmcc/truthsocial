@@ -5,8 +5,10 @@ require 'rails_helper'
 describe REST::StatusSerializer do
 	let!(:account) { Fabricate(:account) }
 	let!(:user) { Fabricate(:user) }
+	let!(:parent_with_self_visibility)  { Fabricate(:status, account: account, visibility: :self) }
 	let!(:parent)  { Fabricate(:status, account: account, visibility: :public) }
 	let!(:reply)  { Fabricate(:status, account: account, thread: parent, visibility: :public) }
+	let!(:reply_to_self_visibility)  { Fabricate(:status, account: account, thread: parent_with_self_visibility, visibility: :public) }
 	let!(:nested_reply)  { Fabricate(:status, account: account, thread: reply, visibility: :public) }
 
 	subject { JSON.parse(@serialization.to_json) }
@@ -75,5 +77,16 @@ describe REST::StatusSerializer do
 			expect(subject['in_reply_to']).to eq(nil)
 		end
 	end
+
+	context 'when a parent quote truth is marked as self' do
+		before(:each) do
+			@serialization = ActiveModelSerializers::SerializableResource.new(reply_to_self_visibility, serializer: REST::StatusSerializer, scope: user, scope_name: :current_user)
+		end
+
+		it 'returns an empty In Reply To object' do
+			expect(subject['in_reply_to']).to eq(nil)
+		end
+	end
+
 
 end

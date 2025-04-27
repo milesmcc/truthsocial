@@ -28,7 +28,8 @@ class Api::V1::MediaController < Api::BaseController
   private
 
   def status_code_for_media_attachment
-    @media_attachment.not_processed? ? 206 : 200
+    # @media_attachment.not_processed? ? 206 : 200
+    200
   end
 
   def set_media_attachment

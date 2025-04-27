@@ -77,7 +77,7 @@ class Announcement < ApplicationRecord
       end
     end
 
-    ActiveRecord::Associations::Preloader.new.preload(records, :custom_emoji)
+    ActiveRecord::Associations::Preloader.new.preload(records, [:account_follower, :account_following, :account_status])
     records
   end
 

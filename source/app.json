@@ -93,10 +93,16 @@
     }
   ],
   "scripts": {
-    "postdeploy": "bundle exec rails db:migrate && bundle exec rails db:seed"
+    "postdeploy": "bundle exec rails db:schema:load && bundle exec rails db:seed"
   },
   "addons": [
     "heroku-postgresql",
     "heroku-redis"
-  ]
+  ],
+  "dokku": {
+    "plugins": [
+      "postgres",
+      "redis"
+    ]
+  }
 }

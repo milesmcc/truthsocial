@@ -18,6 +18,7 @@ class Mobile::PushNotificationWorker
     return unless @endpoint.present? && @notification.activity.present? && @subscription.pushable?(@notification)
 
     payload = push_notification_json
+
     request_pool.with(Addressable::URI.parse(@endpoint).normalized_site) do |http_client|
       request = Request.new(:post, @endpoint, body: payload, http_client: http_client)
 
@@ -31,9 +32,7 @@ class Mobile::PushNotificationWorker
         # assume that the subscription is invalid or expired
         # and must be removed
 
-        if (400..499).cover?(response.code) && ![408, 429].include?(response.code)
-          @subscription.destroy!
-        elsif !(200...300).cover?(response.code)
+        if !(200...300).cover?(response.code)
           raise Mastodon::UnexpectedResponseError, response
         end
       end

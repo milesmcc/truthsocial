@@ -29,8 +29,6 @@ class StatusStat < ApplicationRecord
     [attributes['favourites_count'], 0].max
   end
 
-  private
-
   def reset_parent_cache
     Rails.cache.delete("statuses/#{status_id}")
     InvalidateSecondaryCacheService.new.call("InvalidateStatusCacheWorker", status_id)

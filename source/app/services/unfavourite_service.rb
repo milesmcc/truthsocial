@@ -7,6 +7,7 @@ class UnfavouriteService < BaseService
     favourite = Favourite.find_by!(account: account, status: status)
     favourite.destroy!
     create_notification(favourite) if !status.account.local? && status.account.activitypub?
+    InteractionsTracker.new(account.id, status.account_id, :favourite, account.following?(status.account_id), status.group).untrack
     favourite
   end
 

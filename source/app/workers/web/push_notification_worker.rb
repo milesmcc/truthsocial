@@ -3,7 +3,7 @@
 class Web::PushNotificationWorker
   include Sidekiq::Worker
 
-  sidekiq_options queue: 'push', retry: 5
+  sidekiq_options queue: 'push', retry: false
 
   TTL     = 48.hours.to_s
   URGENCY = 'normal'

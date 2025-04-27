@@ -40,10 +40,8 @@ class Follow < ApplicationRecord
   end
 
   before_validation :set_uri, only: :create
-  after_create :increment_cache_counters
   after_create :invalidate_hash_cache
   after_destroy :remove_endorsements
-  after_destroy :decrement_cache_counters
   after_destroy :invalidate_hash_cache
 
   private
@@ -54,16 +52,6 @@ class Follow < ApplicationRecord
 
   def remove_endorsements
     AccountPin.where(target_account_id: target_account_id, account_id: account_id).delete_all
-  end
-
-  def increment_cache_counters
-    account&.increment_count!(:following_count)
-    target_account&.increment_count!(:followers_count)
-  end
-
-  def decrement_cache_counters
-    account&.decrement_count!(:following_count)
-    target_account&.decrement_count!(:followers_count)
   end
 
   def invalidate_hash_cache

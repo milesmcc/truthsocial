@@ -14,6 +14,7 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
 
   def set_account
     @account = Account.find(params[:account_id])
+    @pagination_enabled = (@account == current_account)
   end
 
   def load_accounts
@@ -29,30 +30,38 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
   end
 
   def default_accounts
-    Account.includes(:active_relationships, :account_stat).references(:active_relationships)
+    Account.includes(:active_relationships, :account_follower, :account_following, :account_status).references(:active_relationships)
   end
 
   def paginated_follows
-    Follow.where(target_account: @account).paginate_by_min_id(
-      limit_param(DEFAULT_ACCOUNTS_LIMIT),
-      params[:min_id],
-      params[:max_id]
-    )
+    if @pagination_enabled
+      Follow.where(target_account: @account).paginate_by_max_id(
+        limit_param(DEFAULT_ACCOUNTS_LIMIT),
+        params[:max_id],
+        params[:since_id]
+      )
+    else
+      Follow.where(target_account: @account).paginate_by_min_id(
+        limit_param(DEFAULT_ACCOUNTS_LIMIT),
+        nil,
+        nil
+      )
+    end
   end
 
   def insert_pagination_headers
-    set_pagination_headers(next_path, prev_path)
+    set_pagination_headers(next_path, prev_path) if @pagination_enabled
   end
 
   def next_path
     if records_continue?
-      api_v1_account_followers_url pagination_params(min_id: pagination_max_id)
+      api_v1_account_followers_url pagination_params(max_id: pagination_max_id)
     end
   end
 
   def prev_path
     unless @accounts.empty?
-      api_v1_account_followers_url pagination_params(max_id: pagination_min_id)
+      api_v1_account_followers_url pagination_params(since_id: pagination_since_id)
     end
   end
 
@@ -60,7 +69,7 @@ class Api::V1::Accounts::FollowerAccountsController < Api::BaseController
     @accounts.last.active_relationships.first.id
   end
 
-  def pagination_min_id
+  def pagination_since_id
     @accounts.first.active_relationships.first.id
   end
 

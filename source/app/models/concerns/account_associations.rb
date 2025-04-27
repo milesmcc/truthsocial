@@ -30,7 +30,7 @@ module AccountAssociations
 
     # Media
     has_many :media_attachments, dependent: :destroy
-    has_many :polls, dependent: :destroy
+    has_many :polls, dependent: :destroy, through: :statuses
 
     # Report relationships
     has_many :reports, dependent: :destroy, inverse_of: :account
@@ -66,5 +66,27 @@ module AccountAssociations
 
     # Follow recommendations
     has_one :follow_recommendation_suppression, inverse_of: :account, dependent: :destroy
+
+    # Chats
+    has_many :chat_accounts
+    has_many :chats, -> { distinct }, through: :chat_accounts
+    has_many :chat_messages
+
+    # Groups
+    has_many :group_memberships
+    has_many :group_mutes
+
+    has_one :tv_account
+    has_one :tv_channel_account
+    has_and_belongs_to_many :tv_channels, join_table: 'tv.channel_accounts', association_foreign_key: 'channel_id', inverse_of: :account
+    # Feeds
+    has_many :account_feeds, class_name: 'Feeds::AccountFeed'
+    has_many :feeds, through: :account_feeds
+
+    # Recommendation suppressions
+    has_many :group_recommendation_suppressions, class_name: 'Recommendations::GroupSuppression'
+    has_many :account_recommendation_suppressions, class_name: 'Recommendations::AccountSuppression'
+    # Features
+    has_and_belongs_to_many :feature_flags, class_name: 'Configuration::FeatureFlag', join_table: 'configuration.account_enabled_features', association_foreign_key: 'feature_flag_id', inverse_of: :account
   end
 end

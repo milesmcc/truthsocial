@@ -65,6 +65,7 @@ describe FollowerAccountsController do
         let(:page) { 1 }
 
         it 'returns followers' do
+          Procedure.process_account_follower_statistics_queue
           expect(response).to have_http_status(200)
           expect(body['totalItems']).to eq 2
           expect(body['partOf']).to be_present
@@ -96,6 +97,7 @@ describe FollowerAccountsController do
         let(:page) { nil }
 
         it 'returns followers' do
+          Procedure.process_account_follower_statistics_queue
           expect(response).to have_http_status(200)
           expect(body['totalItems']).to eq 2
           expect(body['partOf']).to be_blank

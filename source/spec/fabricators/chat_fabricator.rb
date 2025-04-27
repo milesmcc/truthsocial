@@ -1,0 +1,2 @@
+Fabricator(:chat) do
+end

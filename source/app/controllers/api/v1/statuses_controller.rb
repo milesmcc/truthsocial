@@ -2,6 +2,9 @@
 
 class Api::V1::StatusesController < Api::BaseController
   include Authorization
+  include Divergable
+  include Redisable
+  include AdsConcern
 
   before_action -> { authorize_if_got_token! :read, :'read:statuses' }, except: [:create, :destroy]
   before_action -> { doorkeeper_authorize! :write, :'write:statuses' }, only:   [:create, :destroy]
@@ -9,7 +12,13 @@ class Api::V1::StatusesController < Api::BaseController
   before_action :set_status, only:       [:show, :context, :ancestors, :descendants]
   before_action :set_thread, only:       [:create]
   before_action :require_authenticated_user!, unless: :allowed_public_access?
+  before_action :diverge_users_without_current_ip, only: [:create]
+  before_action :set_group, only: [:create]
+  before_action :reject_duplicate_group_status, only: [:create]
   after_action :insert_pagination_headers, only: :descendants
+  after_action :create_device_verification_status, only: :create
+
+  include Assertable
 
   override_rate_limit_headers :create, family: :statuses
 
@@ -19,10 +28,17 @@ class Api::V1::StatusesController < Api::BaseController
   # than this anyway
   CONTEXT_LIMIT = 4_096
   PAGINATED_LIMIT = 20
+  STATUS_HASH_CACHE_EXPIRE_AFTER = 1.hour.seconds
+  DUPLICATE_THRESHOLD = 3
 
   def show
     @status = cache_collection([@status], Status).first
-    render json: @status, serializer: REST::StatusSerializer
+
+    if (@status.visibility == 'self' && current_user.account_id != @status.account.id) || @status.group&.discarded?
+      raise(ActiveRecord::RecordNotFound)
+    end
+
+    render json: REST::V2::StatusSerializer.new(context: { current_user: current_user }).serialize(@status)
   end
 
   def context
@@ -34,6 +50,8 @@ class Api::V1::StatusesController < Api::BaseController
 
   def descendants
     @descendants = prepare_descendants(PAGINATED_LIMIT)
+    include_ad_indexes(@descendants)
+
     render_context_subitems(@descendants)
   end
 
@@ -46,6 +64,9 @@ class Api::V1::StatusesController < Api::BaseController
   end
 
   def create
+    whitelisted_visibilities = ['public', 'group', nil]
+    render json: { error: 'This action is not allowed' }, status: 403 and return unless whitelisted_visibilities.include?(status_params[:visibility])
+
     @status = PostStatusService.new.call(current_user.account,
                                          text: status_params[:status],
                                          mentions: status_params[:to],
@@ -54,25 +75,30 @@ class Api::V1::StatusesController < Api::BaseController
                                          sensitive: status_params[:sensitive],
                                          spoiler_text: status_params[:spoiler_text],
                                          visibility: status_params[:visibility],
+                                         group: @group,
+                                         group_timeline_visible: status_params[:group_timeline_visible],
+                                         group_visibility: @group_visibility || nil,
                                          scheduled_at: status_params[:scheduled_at],
                                          application: doorkeeper_token.application,
                                          poll: status_params[:poll],
                                          quote_id: status_params[:quote_id],
                                          idempotency: request.headers['Idempotency-Key'],
-                                         with_rate_limit: true)
+                                         with_rate_limit: true,
+                                         ip_address: request.remote_ip,
+                                         domain: Addressable::URI.parse(request.url).normalized_host)
 
-    render json: @status, serializer: @status.is_a?(ScheduledStatus) ? REST::ScheduledStatusSerializer : REST::StatusSerializer
+    render json: REST::V2::StatusSerializer.new(context: { current_user: current_user }).serialize(@status)
   end
 
   def destroy
     @status = Status.where(account_id: current_user.account).find(params[:id])
     authorize @status, :destroy?
-
     @status.reblogs.update_all(deleted_at: Time.current, deleted_by_id: current_user&.account_id)
     @status.update!(deleted_at: Time.current, deleted_by_id: current_user&.account_id)
-    RemovalWorker.perform_async(@status.id, redraft: true)
+    @thread = Status.find_by(id: @status.in_reply_to_id) if @status.in_reply_to_id
+    RemovalWorker.perform_async(@status.id, redraft: true, called_by_id: current_account.id)
     remove_from_whale_list if @status.account.whale?
-    @status.account.statuses_count = @status.account.statuses_count - 1
+    @status.status_pins&.destroy_all
 
     render json: @status, serializer: REST::StatusSerializer, source_requested: true
   end
@@ -83,13 +109,34 @@ class Api::V1::StatusesController < Api::BaseController
     @status = Status.find(params[:id])
     authorize @status, :show?
   rescue Mastodon::NotPermittedError
-    not_found
+    raise ActiveRecord::RecordNotFound
   end
 
   def set_thread
     @thread = status_params[:in_reply_to_id].blank? ? nil : Status.find(status_params[:in_reply_to_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: I18n.t('statuses.errors.in_reply_not_found') }, status: 404
+  end
+
+  def set_group
+    quoted = status_params[:quote_id].presence && Status.find(status_params[:quote_id])
+    group_id = status_params[:group_id].presence || quoted&.group&.id || @thread&.group&.id
+    group = Group.find_by(id: group_id) if group_id
+    @group = if group&.discarded?
+               false
+             elsif quoted
+               quoted.group&.everyone? ? group_member?(group) && group : group # We don't want to set group if quoted group is a public group and the "quoter" is not a member.
+             else
+               group
+             end
+
+    if @group.present?
+      policy = status_params[:quote_id].present? ? :show? : :post?
+      authorize(@group, policy)
+      @group_visibility = @group.statuses_visibility
+    end
+  rescue ActiveRecord::RecordNotFound, Mastodon::NotPermittedError
+    render json: { error: I18n.t('statuses.errors.not_permitted_to_post') }, status: 404
   end
 
   def status_params
@@ -99,13 +146,14 @@ class Api::V1::StatusesController < Api::BaseController
       :sensitive,
       :spoiler_text,
       :visibility,
+      :group_id,
+      :group_timeline_visible,
       :scheduled_at,
       :quote_id,
       to: [],
       media_ids: [],
       poll: [
         :multiple,
-        :hide_totals,
         :expires_in,
         options: [],
       ]
@@ -143,5 +191,48 @@ class Api::V1::StatusesController < Api::BaseController
 
   def allowed_public_access?
     current_user || (action_name == 'show' && @status&.account&.user&.unauth_visibility? && !@status&.reply?)
+  end
+
+  def validate_client
+    action_assertable?
+  end
+
+  def asserting?
+    request.headers['x-tru-assertion'] && action_assertable?
+  end
+
+  def action_assertable?
+    %w(create).include?(action_name) ? true : false
+  end
+
+  def log_android_activity?
+    current_user&.user_sms_reverification_required && action_assertable?
+  end
+
+  def create_device_verification_status
+    DeviceVerificationStatus.insert(verification_id: @device_verification.id, status_id: @status.id) if @device_verification && @status
+  end
+
+  def group_member?(group)
+    group&.members&.where(id: current_account&.id)&.exists?
+  end
+
+  def reject_duplicate_group_status
+    return if @group.blank?
+    return if status_params[:status].blank?
+
+    status_hash = hexdigest status_params[:status]
+    key = "status:#{current_account.id}:#{status_hash}"
+    # cached_value = redis.get(key).to_i
+    # configuration = ::Configuration::FeatureSetting.find_by(name: 'rate_limit_duplicate_group_status_enabled')
+    # render json: { error: I18n.t('errors.429') }, status: 429 and return if cached_value.to_i >= DUPLICATE_THRESHOLD && ActiveModel::Type::Boolean.new.cast(configuration&.value)
+
+    redis.incrby(key, 1)
+    redis.expire(key, STATUS_HASH_CACHE_EXPIRE_AFTER)
+
+    cached_value = redis.get(key).to_i
+    if cached_value.to_i >= DUPLICATE_THRESHOLD
+      Rails.logger.info "Groups rate limit: User -> #{current_user.id} has exceeded the threshold. Current hits -> #{cached_value.to_i}, remote_ip -> #{request.remote_ip}"
+    end
   end
 end

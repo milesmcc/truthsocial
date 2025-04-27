@@ -53,6 +53,8 @@ pt-BR:
       other: usuários
     user_count_before: Casa de
     what_is_mastodon: O que é Mastodon?
+  ads:
+    why_copy: Mostramos anúncios de produtos e serviços que achamos que nossos usuários podem gostar.
   accounts:
     choices_html: 'Sugestões de %{name}:'
     endorsements_hint: Você pode sugerir pessoas que você segue, elas aparecerão aqui.
@@ -641,6 +643,8 @@ pt-BR:
       edit_preset: Editar o aviso pré-definido
       title: Gerenciar os avisos pré-definidos
   admin_mailer:
+    account_invitation:
+      subject: Você foi convidado a entrar no Truth Social!
     new_pending_account:
       body: Os detalhes da nova conta estão abaixo. Você pode aprovar ou vetar.
       subject: Nova conta para revisão em %{instance} (%{username})
@@ -698,7 +702,7 @@ pt-BR:
     didnt_get_confirmation: Não recebeu instruções de confirmação?
     dont_have_your_security_key: Não está com a sua chave de segurança?
     forgot_password: Esqueceu a sua senha?
-    invalid_reset_password_token: Código de alteração de senha é inválido ou expirou. Por favor, solicite um novo.
+    invalid_reset_password_token: O token de redefinição de senha é inválido ou expirou. Solicite um novo token.
     link_to_otp: Digite um código de duas etapas do seu telefone ou um código de recuperação
     link_to_webauth: Use seu dispositivo de chave de segurança
     login: Entrar
@@ -742,6 +746,11 @@ pt-BR:
     hint_html: "<strong>Dica:</strong> Não pediremos novamente sua senha pela próxima hora."
     invalid_password: Senha inválida
     prompt: Confirme sua senha para continuar
+  chats:
+    errors:
+      creator_started: Não foi possível aceitar esse chat já que você o iniciou
+      blocked_constraints: Não foi possível executar a solicitação devido a restrições bloqueadas
+      unfollowed_and_left_chat_by_user: This user has left the chat and no longer follows you
   crypto:
     errors:
       invalid_key: não é uma chave Ed25519 ou Curve25519 válida
@@ -762,11 +771,11 @@ pt-BR:
       x_months: "%{count}m"
       x_seconds: "%{count}seg"
   deletes:
-    challenge_not_passed: As informações que você inseriu não estão corretas
+    challenge_not_passed: A informação que você inseriu não está correta
     confirm_password: Digite a sua senha atual para verificar a sua identidade
     confirm_username: Digite seu nome de usuário para confirmar o procedimento
     proceed: Excluir conta
-    success_msg: A sua conta foi excluída com sucesso
+    success_msg: Sua conta foi excluída com sucesso
     warning:
       before: 'Antes de prosseguir, por favor leia com cuidado:'
       caches: Conteúdo que foi armazenado em cache por outras instâncias pode continuar a existir
@@ -793,12 +802,27 @@ pt-BR:
     '422':
       content: Falha na verificação de segurança. Você está bloqueando cookies?
       title: Falha na verificação de segurança
-    '429': Muitas solicitações
+    '429': Excesso de solicitações
     '500':
       content: Desculpe, algo deu errado por aqui.
       title: Esta página não está certa
     '503': A página não pôde ser carregada devido a uma falha temporária do servidor.
     noscript_html: Para usar o aplicativo web do Mastodon, por favor ative o JavaScript. Ou, se quiser, experimente um dos <a href="%{apps_path}">aplicativos nativos</a> para o Mastodon em sua plataforma.
+    api:
+      '401': Esse método requer um usuário autenticado
+      '403': Essa ação não é permitida
+      '404': Registro não encontrado
+      '503': Ocorreu um problema temporário ao atender sua solicitação. Tente novamente.
+      assertion: Não foi possível verificar sua afirmação
+      attestation: Não foi possível verificar seu atestado
+      data_fetch: Não foi possível resgatar os dados remotos
+      duplicate: Registro duplicado
+      login_disabled: No momento seu login está desativado
+      login_pending: No momento seu login está aguardando aprovação
+      missing_email: Está faltando um endereço de e-mail confirmado para o seu login
+      ssl: Não foi possível verificar o Certificado SSL remoto
+      outside_scopes: Essa ação está fora do escopo autorizado
+      unauthorized: Não autorizado
   existing_username_validator:
     not_found: não foi possível encontrar um usuário local com esse nome de usuário
     not_found_multiple: não foi possível encontrar %{usernames}
@@ -846,7 +870,7 @@ pt-BR:
     trending_now: Em alta no momento
   generic:
     all: Tudo
-    changes_saved_msg: Alterações foram salvas com sucesso!
+    changes_saved_msg: Alterações salvas com sucesso!
     copy: Copiar
     delete: Excluir
     no_batch_actions_available: Nenhuma ação em lote disponível nesta página
@@ -855,6 +879,10 @@ pt-BR:
     validation_errors:
       one: Algo errado não está certo! Por favor, analise o erro abaixo
       other: Algo errado não está certo! Por favor, analise os %{count} erros abaixo
+  groups:
+    errors:
+      pending_request_conflict: O proprietário ou administrador do grupo já tomou medidas sobre esta solicitação.
+      too_many_admins: Você pode atribuir até %{count} administradores para o grupo.
   html_validator:
     invalid_markup: 'contém HTML inválido: %{error}'
   identity_proofs:
@@ -920,9 +948,9 @@ pt-BR:
       limit: Você atingiu o máximo de listas
   media_attachments:
     validations:
-      images_and_video: Não foi possível anexar um vídeo a um toot que já contém imagens
-      not_ready: Não é possível anexar arquivos que não terminaram de ser processados. Tente novamente daqui a pouco!
-      too_many: Não foi possível anexar mais de 4 imagens
+      images_and_video: Não é possível anexar um vídeo a uma postagem que já contém imagens
+      not_ready: Não é possível anexar arquivos cujo processamento ainda não foi concluído. Tente novamente daqui a pouco!
+      too_many: Não é possível anexar mais de 4 arquivos
   migrations:
     acct: Mudou-se para
     cancel: Cancelar redirecionamento
@@ -961,39 +989,133 @@ pt-BR:
     carry_mutes_over_text: Este usuário mudou de %{acct}, que você havia silenciado.
     copy_account_note_text: 'Este usuário saiu de %{acct}, aqui estão suas notas anteriores sobre ele:'
   notification_mailer:
+    chat:
+      subject: "Nova mensagem de %{name}"
+      subject_android: "lhe enviou uma mensagem"
+      sent_message: "Nova mensagem"
     digest:
       action: Ver todas as notificações
-      body: Aqui está um breve resumo das mensagens que você perdeu desde o seu último acesso em %{since}
-      mention: "%{name} te mencionou em:"
+      body: Aqui está um breve resumo das mensagens que você não viu desde seu último acesso em %{since}
+      mention: "%{name} mencionou você em:"
       new_followers_summary:
-        one: Você tem um novo seguidor! Uia!
-        other: Você tem %{count} novos seguidores! AÊÊÊ!
+        one: Além disso, enquanto estava fora você ganhou um novo seguidor! Oba!
+        other: Além disso, enquanto estava fora você ganhou %{count} novos seguidores! Incrível!
       subject:
-        one: "Uma nova notificação desde o seu último acesso \U0001F418"
-        other: "%{count} novas notificações desde o seu último acesso \U0001F418"
-      title: Enquanto você estava ausente...
+        one: "1 nova notificação desde seu último acesso \U0001F418"
+        other: "%{count} novas notificações desde seu último acesso \U0001F418"
+      subject_android:
+        one: "1 nova notificação desde seu último acesso \U0001F418"
+        other: "%{count} novas notificações desde seu último acesso \U0001F418"
+      title: Na sua ausência...
     favourite:
-      body: "%{name} favoritou seu toot:"
-      subject: "%{name} favoritou seu toot"
+      body: "Sua postagem foi curtida por %{name}:"
+      subject: "%{name} curtiu sua postagem"
+      subject_android: "gostou da sua Truth"
       title: Novo favorito
+    favourite_group:
+      subject: "%{name} + %{count_others} %{actor} curtiram sua Truth"
+      subject_android: "%{name} e mais %{count_others} pessoas gostaram da sua Truth"
+    group_favourite:
+      body: "Sua postagem foi curtida por %{name}:"
+      subject: "%{name} curtiu sua postagem"
+      subject_android: "gostou da sua Truth em %{group}"
+      title: Novo favorito
+    group_favourite_group:
+      subject: "%{name} + %{count_others} %{actor} curtiram sua Truth"
+      subject_android: "%{name} e mais %{count_others} pessoas gostaram da sua Truth em %{group}"
     follow:
-      body: "%{name} te seguiu!"
-      subject: "%{name} te seguiu"
+      body: "%{name} está seguindo você!"
+      subject: "%{name} está seguindo você"
+      subject_android: "está te seguindo agora"
       title: Novo seguidor
+    follow_group:
+      subject: "%{name} + %{count_others} %{actor} seguiram você"
+      subject_android: "%{name} e %{count_others} outros seguiram você"
     follow_request:
-      action: Gerenciar seguidores pendentes
-      body: "%{name} quer te seguir"
-      subject: 'Seguidor pendente: %{name}'
-      title: Novo seguidor pendente
+      action: Gerenciar solicitações de seguidores
+      body: "%{name} pediu para seguir você"
+      subject: 'Seguidor aguardando: %{name}'
+      subject_android: "pediu para te seguir"
+      title: Nova solicitação de seguidor
     mention:
       action: Responder
-      body: "%{name} te mencionou em:"
-      subject: "%{name} te mencionou"
+      body: "Você foi mencionado por %{name} em:"
+      subject: "Você foi mencionado por %{name}"
+      subject_android: "mencionou você em uma Truth"
       title: Nova menção
+    mention_group:
+      subject: "%{name} + %{count_others} %{actor} mencionaram você"
+      subject_android: "%{name} e %{count_others} outros mencionaram você"
+    group_mention:
+      action: Responder
+      body: "Você foi mencionado por %{name} em:"
+      subject: "Você foi mencionado por %{name}"
+      subject_android: "mencionou você em %{group}"
+      title: Nova menção
+    group_mention_group:
+      subject: "%{name} + %{count_others} %{actor} mencionaram você"
+      subject_android: "%{name} e %{count_others} outros mencionaram você"
+    poll:
+      subject: Uma enquete postada por %{name} foi encerrada
+      subject_android: "concluiu uma enquete"
     reblog:
-      body: "%{name} deu boost no seu toot:"
-      subject: "%{name} deu boost no seu toot"
-      title: Novo boost
+      body: "Sua Truth foi RePostada por %{name}:"
+      subject: "%{name} RePostou sua Truth"
+      subject_android: "ReTruthed sua Truth"
+      title: Nova RePostagem
+    reblog_group:
+      subject: "%{name} + %{count_others} %{actor} RePostaram sua Truth"
+      subject_android: "%{name} e mais %{count_others} outros ReTruthed sua Truth"
+    group_reblog:
+      body: "Sua Truth foi RePostada por %{name}:"
+      subject: "%{name} RePostou sua Truth"
+      subject_android: "ReTruthed sua Truth de %{group}"
+      title: Nova RePostagem
+    group_reblog_group:
+      subject: "%{name} + %{count_others} %{actor} RePostaram sua Truth"
+      subject_android: "%{name} e %{count_others} outros ReTruthed a sua Truth de grupo"
+    group_request:
+      body: '%{name} wants to join your group:'
+      subject: "%{name} wants to join your group"
+      subject_android: "você tem uma nova solicitação de membro"
+      title: Group Join Request
+    status:
+      subject: "%{name} acabou de postar"
+      subject_android: "acabou de postar"
+    group_promoted:
+      body: You are now an admin for %{group}
+      subject: You are now an admin for %{group}
+      subject_android: "agora você é um administrador"
+      title: You're an admin
+    group_demoted:
+      body: You are no longer an admin for %{group}
+      subject: You are no longer an admin for %{group}
+      subject_android: "você não é mais administrador"
+      title: You're no longer an admin
+    user_approved:
+      edit_profile_action: Ir para o perfil
+      edit_profile_step: Para terminar, não deixe de personalizar seu perfil carregando um avatar, um título, mudando seu nome escolhido e muito mais. Se quiser avaliar novos seguidores antes de aprová-los, você pode bloquear sua conta.
+      explanation: Estamos super empolgados com sua chegada à nossa comunidade de Buscadores da Verdade. Acreditamos na liberdade de expressão e incentivamos todos os pontos de vista, já que não discriminamos ninguém devido a uma ideologia política.
+      extra_step: Além disso, gostaríamos de lembrar que somos uma plataforma nova e ainda estamos corrigindo vários bugs na nossa tecnologia. Podemos garantir que estamos trabalhando duro para aprimorar tudo o mais rápido possível! Obrigado!
+      final_action: Comece a postar
+      final_step: 'Comece a postar! Mesmo sem nenhum seguidor suas postagens públicas podem ser vistas por outras pessoas, por exemplo, na timeline local e nas hashtags. Você pode querer se apresentar com a hashtag #apresentações.'
+      full_handle: Seu identificador completo (handle)
+      full_handle_hint: É o que você quer dizer aos seus amigos para que possam seguir você ou lhe enviar mensagens de outro servidor.
+      review_preferences_action: Mudar preferências
+      review_preferences_step: Não deixe de configurar suas preferências, como os e-mails que quer receber ou o nível de privacidade padrão para as suas postagens. Se não costuma sentir enjoo você pode optar por reproduzir GIFs automaticamente.
+      subject: "Sua espera terminou! Toque aqui para começar a usar o Truth Social."
+      subject_android: "Sua espera terminou! Toque aqui para começar a usar o Truth Social."
+      web:
+        subject: "Bem-vindo(a) ao Truth, onde a Verdade impera"
+      tip_federated_timeline: A timeline federada é uma ampla visão ao vivo da rede do Truth. Mas só inclui as pessoas que seus vizinhos estão seguindo, então não é uma visão completa.
+      tip_following: Você segue os administradores do seu servidor por padrão Para encontrar mais gente interessante, verifique sua timeline local e federada.
+      tip_local_timeline: A timeline local é uma visão ao vivo das pessoas em %{instance}. São seus vizinhos de porta!
+      tip_mobile_webapp: Se o seu navegador móvel sugerir que você adicione o Truth à sua tela inicial, você poderá receber notificações por push. O Truth funciona de muitas maneiras como um aplicativo nativo!
+      tips: Dicas
+      title: Bem-vindo(a) ao Truth Social, %{name}!
+    verify_sms_prompt:
+      subject: Sua conta já está ativa no Truth Social! Atualize para a versão mais recente e entre para a nossa turma!
+      subject_android: Sua conta já está ativa no Truth Social! Atualize para a versão mais recente e entre para a nossa turma!
   notifications:
     email_events: Eventos para notificações por e-mail
     email_events_hint: 'Selecione os eventos que deseja receber notificações:'
@@ -1014,7 +1136,7 @@ pt-BR:
     instructions_html: "<strong>Escaneie este código QR no Google Authenticator ou em um aplicativo TOTP similar no seu telefone</strong>. A partir de agora, esse aplicativo irá gerar tokens que você terá que digitar ao fazer login."
     manual_instructions: 'Se você não pode escanear o código QR e precisa digitá-lo manualmente, aqui está o segredo em texto:'
     setup: Configurar
-    wrong_code: O código digitado é inválido! O horário do servidor e o horário do dispositivo estão corretos?
+    wrong_code: O código que você inseriu é inválido!
   pagination:
     newer: Mais novo
     next: Próximo
@@ -1108,7 +1230,7 @@ pt-BR:
       windows_mobile: Windows Mobile
       windows_phone: Windows Phone
     revoke: Fechar
-    revoke_success: Sessão fechada com sucesso
+    revoke_success: A sessão foi revogada com sucesso
     title: Sessões
   settings:
     account: Conta
@@ -1150,7 +1272,7 @@ pt-BR:
       one: 'continha hashtag não permitida: %{tags}'
       other: 'continha hashtags não permitidas: %{tags}'
     errors:
-      in_reply_not_found: O toot que você quer responder parece não existir.
+      in_reply_not_found: Parece que a postagem à qual você está tentando responder não existe.
     language_detection: Detectar idioma automaticamente
     open_in_web: Abrir no navegador
     over_character_limit: limite de caracteres de %{max} excedido
@@ -1279,7 +1401,7 @@ pt-BR:
   two_factor_authentication:
     add: Adicionar
     disable: Desativar
-    disabled_success: Autenticação de dois fatores desabilitada com sucesso
+    disabled_success: Autenticação de dois fatores desativada com sucesso
     edit: Editar
     enabled: Autenticação de dois fatores ativada
     enabled_success: Autenticação de dois fatores ativada com sucesso
@@ -1288,28 +1410,34 @@ pt-BR:
     methods: Métodos de dois fatores
     otp: Aplicativo autenticador
     recovery_codes: Códigos de recuperação de reserva
-    recovery_codes_regenerated: Códigos de recuperação gerados com sucesso
+    recovery_codes_regenerated: Códigos de recuperação regerados com sucesso
     recovery_instructions_html: Se você perder acesso ao seu celular, você pode usar um dos códigos de recuperação abaixo para acessar a sua conta. <strong>Mantenha os códigos de recuperação em um local seguro</strong>. Por exemplo, você pode imprimi-los e guardá-los junto com outros documentos importantes.
     webauthn: Chaves de segurança
   user_mailer:
     backup_ready:
       explanation: Você pediu um backup completo da sua conta no Mastodon. E agora está pronto para ser baixado!
-      subject: Seu arquivo está pronto para ser baixado
+      subject: Seu arquivo está pronto para download
       title: Baixar arquivo
     sign_in_token:
       details: 'Aqui estão os detalhes da tentativa:'
       explanation: 'Detectamos uma tentativa de acessar sua conta a partir de um endereço IP não reconhecido. Se for você, insira o código de segurança abaixo na página de desafio:'
       further_actions: 'Se não foi você, por favor mude sua senha e ative a autenticação de dois fatores em sua conta. Você pode fazê-lo aqui:'
-      subject: Por favor, confirme a tentativa de acesso
+      subject: Confirme a tentativa de login
       title: Tentativa de acesso
+    status_removed:
+      explanation: We use artificial intelligence (AI) to assist our hardworking moderators, and some Truths are flagged for deletion or marked “sensitive” by AI. While the AI we use is very good, it is not error-proof. Assisted by technology, our moderators use their best judgment to ensure compliance with our Terms of Service. Please give our team time to review your Truth to determine whether it violates our Terms of Service. After a thorough review, we will reinstate the Truth or uphold its removal.
+      title: Your Truth was flagged for review
+      subject: Sua Truth foi sinalizada para revisão
     warning:
       explanation:
-        disable: Enquanto sua conta está congelada, seus dados de conta permanecem intactos, mas você não pode realizar nenhuma ação até que esteja destrancada.
-        sensitive: Seus arquivos de mídia carregados e mídias vinculadas serão tratados como sensíveis.
-        silence: Enquanto sua conta está silenciada, somente pessoas que já estão seguindo você poderão ver seus toots nessa instância, e você pode ser excluído de várias listas públicas. No entanto, outros ainda podem te seguir manualmente.
-        suspend: Sua conta foi banida e todos os seus toots e mídias foram irreversivelmente excluídos desta instância e das instâncias dos seus seguidores.
-        verify: Você é um membro certificado da comunidade
-        unverify: Você não é mais um membro certificado da comunidade.
+        ban_html: Sua conta foi banida por violar nossos Termos de Serviço. Banimentos sem prazo definido são um tipo de sanção raro e muito grave, geralmente aplicados somente às mais sérias violações de nossos Termos de Serviço. Se você acredita que nossa decisão de banir sua conta foi injusta, imoral ou simplesmente errada, recomendamos que entre com um recurso. Envie um e-mail para %{email}. Na linha de assunto, escreva "@Appeal" junto com seu nome de usuário. Aguarde 48 horas para que nossa equipe avalie seu recurso contra o banimento. Após uma avaliação cuidadosa, decidiremos reverter ou manter o banimento.
+        disable_html: Você não pode mais entrar na sua conta nem usá-la de qualquer forma que seja, mas seu perfil e seus outros dados permanecerão intactos.
+        sensitive_html: Os arquivos de mídia que você carregou e os links de mídia que publicou serão tratados como confidenciais.
+        silence_html: Você continua podendo usar sua conta, mas apenas as pessoas que já seguem você verão suas postagens nesse servidor. Além disso, você poderá ser excluído de várias listagens públicas. No entanto, as pessoas continuam podendo seguir você manualmente.
+        suspend_html: Sua conta foi suspensa e ficará inacessível por %{suspension_duration}.
+        suspend_indefinite_html: Sua conta foi suspensa e ficará inacessível.
+        verify_html: Você é um membro certificado da comunidade
+        unverify_html: Você não é mais um membro certificado da comunidade
       get_in_touch: Você pode responder a este e-mail para entrar em contato com a equipe de %{instance}.
       review_server_policies: Revisar as políticas da instância
       statuses: 'Especificamente, para:'
@@ -1329,6 +1457,8 @@ pt-BR:
         suspend: Conta banida
         verify: Conta verificada
         unverify: Verificação de conta removida
+    waitlisted:
+      title: Sua conta foi criada com sucesso!
     welcome:
       edit_profile_action: Configurar perfil
       edit_profile_step: Você pode personalizar o seu perfil enviando um avatar, uma capa, alterando seu nome de exibição e etc. Se você preferir aprovar seus novos seguidores antes de eles te seguirem, você pode trancar a sua conta.
@@ -1350,8 +1480,10 @@ pt-BR:
     follow_limit_reached: Você não pode seguir mais de %{limit} pessoas
     generic_access_help_html: Problemas para acessar sua conta? Você pode entrar em contato com %{email} para obter ajuda
     invalid_otp_token: Código de dois fatores inválido
-    invalid_sign_in_token: Cógido de segurança inválido
+    invalid_sign_in_token: Código de segurança inválido
     otp_lost_help_html: Se você perder o acesso à ambos, você pode entrar em contato com %{email}
+    previously_used_password: Por favor, use uma senha que você não usou anteriormente.
+    password_mismatch: A senha e a confirmação da senha não coincidem.
     seamless_external_login: Você entrou usando um serviço externo, então configurações de e-mail e senha não estão disponíveis.
     signed_in_as: 'Entrou como:'
     suspicious_sign_in_confirmation: Parece que você não fez login deste dispositivo antes, e você não fez login por um tempo. Portanto, estamos enviando um código de segurança para o seu endereço de e-mail para confirmar que é você.

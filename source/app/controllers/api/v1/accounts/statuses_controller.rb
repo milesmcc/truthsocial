@@ -8,7 +8,11 @@ class Api::V1::Accounts::StatusesController < Api::BaseController
   after_action :insert_pagination_headers, unless: -> { truthy_param?(:pinned) }
 
   def index
-    @statuses  = load_statuses
+    @statuses = load_statuses
+    if (ad_indexes = ENV.fetch('X_TRUTH_AD_INDEXES', nil))
+      response.headers['x-truth-ad-indexes'] = ad_indexes
+    end
+
     render json: @statuses, each_serializer: REST::StatusSerializer, relationships: StatusRelationshipsPresenter.new(@statuses, current_user&.account_id)
   end
 
@@ -49,7 +53,7 @@ class Api::V1::Accounts::StatusesController < Api::BaseController
   def pinned_scope
     return Status.none if @account.blocking?(current_account)
 
-    @account.pinned_statuses
+    @account.pinned_statuses.merge!(StatusPin.profile_pins)
   end
 
   def no_replies_scope

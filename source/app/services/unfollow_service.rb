@@ -34,6 +34,8 @@ class UnfollowService < BaseService
 
     InvalidateSecondaryCacheService.new.call("InvalidateFollowCacheWorker", @source_account.id, @target_account.id, @target_account.whale?)
 
+    remove_follower_interactions(@source_account.id, @target_account.id)
+
     follow
   end
 
@@ -63,5 +65,11 @@ class UnfollowService < BaseService
 
   def build_reject_json(follow)
     Oj.dump(serialize_payload(follow, ActivityPub::RejectFollowSerializer))
+  end
+
+  def remove_follower_interactions(source_account_id, target_account_id)
+    InteractionsTracker.new(source_account_id, target_account_id, false, true).remove
+    redis.del("avatars_carousel_list_#{source_account_id}")
+    InvalidateSecondaryCacheService.new.call("InvalidateAvatarsCarouselCacheWorker", source_account_id)
   end
 end

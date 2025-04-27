@@ -318,6 +318,10 @@ function main() {
       }
     });
   });
+
+  delegate(document, '[data-behavior="close-window"]', 'click', () => {
+    window.open('', '_parent', '').close();
+  });
 }
 
 loadPolyfills()

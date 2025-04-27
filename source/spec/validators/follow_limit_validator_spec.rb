@@ -37,7 +37,7 @@ RSpec.describe FollowLimitValidator, type: :validator do
           expect(errors).to have_received(:add)
             .with(:base, I18n.t('users.follow_limit_reached', limit: FollowLimitValidator::LIMIT))
           expect(errors).to have_received(:add)
-            .with(:errorCode, 'followLimitReached')
+            .with(:error_code, 'followLimitReached')
         end
       end
 

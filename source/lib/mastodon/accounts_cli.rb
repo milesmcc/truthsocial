@@ -77,7 +77,7 @@ module Mastodon
     def create(username)
       account  = Account.new(username: username)
       password = SecureRandom.hex
-      user     = User.new(email: options[:email], password: password, agreement: true, approved: true, admin: options[:role] == 'admin', moderator: options[:role] == 'moderator', confirmed_at: options[:confirmed] ? Time.now.utc : nil, bypass_invite_request_check: true)
+      user     = User.new(email: options[:email], password: password, agreement: true, approved: true, admin: options[:role] == 'admin', moderator: options[:role] == 'moderator', confirmed_at: options[:confirmed] ? Time.now.utc : nil, bypass_invite_request_check: true, sign_up_city_id: 1, sign_up_country_id: 1)
 
       if options[:reattach]
         account = Account.find_local(username) || Account.new(username: username)
@@ -87,7 +87,13 @@ module Mastodon
           say('Use --force to reattach it anyway and delete the other user')
           return
         elsif account.user.present?
-          DeleteAccountService.new.call(account, reserve_email: false)
+          DeleteAccountService.new.call(
+            account,
+            DeleteAccountService::DELETED_BY_SERVICE,
+            deletion_type: 'mastodon_cli_create',
+            reserve_email: false,
+            skip_activitypub: true,
+          )
         end
       end
 
@@ -192,7 +198,13 @@ module Mastodon
       end
 
       say("Deleting user with #{account.statuses_count} statuses, this might take a while...")
-      DeleteAccountService.new.call(account, reserve_email: false)
+      DeleteAccountService.new.call(
+        account,
+        DeleteAccountService::DELETED_BY_SERVICE,
+        deletion_type: 'mastodon_cli_delete',
+        reserve_email: false,
+        skip_activitypub: true,
+      )
       say('OK', :green)
     end
 
@@ -304,7 +316,13 @@ module Mastodon
         end
 
         if [404, 410].include?(code)
-          DeleteAccountService.new.call(account, reserve_username: false) unless options[:dry_run]
+          DeleteAccountService.new.call(
+            account,
+            DeleteAccountService::DELETED_BY_SERVICE,
+            deletion_type: 'mastodon_cli_cull',
+            reserve_username: false,
+            skip_activitypub: true,
+          ) unless options[:dry_run]
           1
         else
           # Touch account even during dry run to avoid getting the account into the window again

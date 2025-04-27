@@ -24,6 +24,14 @@ feature 'Log in' do
     is_expected.to have_css('div.app-holder')
   end
 
+  scenario 'A valid email and password with extraneous whitespace user is able to log in' do
+    fill_in 'user_email', with: "#{email} "
+    fill_in 'user_password', with: password
+    click_on I18n.t('auth.login')
+
+    is_expected.to have_css('div.app-holder')
+  end
+
   scenario 'A invalid email and password user is not able to log in' do
     fill_in 'user_email', with: 'invalid_email'
     fill_in 'user_password', with: 'invalid_password'

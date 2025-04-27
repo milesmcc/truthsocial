@@ -7,7 +7,7 @@ RSpec.describe Api::V1::Statuses::RebloggedByAccountsController, type: :controll
   let(:app)   { Fabricate(:application, name: 'Test app', website: 'http://testapp.com') }
   let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, application: app, scopes: 'read:accounts') }
   let(:alice) { Fabricate(:account) }
-  let(:bob)   { Fabricate(:account) }
+  let(:bob)   { Fabricate(:account, user: Fabricate(:user)) }
 
   context 'with an oauth token' do
     before do
@@ -39,6 +39,39 @@ RSpec.describe Api::V1::Statuses::RebloggedByAccountsController, type: :controll
         get :index, params: { status_id: status.id, limit: 2 }
         expect(body_as_json.size).to eq 1
         expect(body_as_json[0][:id]).to eq alice.id.to_s
+      end
+
+      context 'with a group status' do
+        let!(:group) { Fabricate(:group, display_name: Faker::Lorem.characters(number: 5), note: Faker::Lorem.characters(number: 5), statuses_visibility: 'members_only', owner_account: user.account) }
+
+        describe 'GET #index' do
+          before do
+            group.memberships.create!(account_id: user.account.id, role: :owner)
+            group.memberships.create!(account_id: bob.id, role: :user)
+          end
+
+          it 'returns http success if user is a member of a private group' do
+            status = Fabricate(:status, account: user.account, visibility: :group, group: group)
+            Fabricate(:status, reblog_of_id: status.id, group: group, visibility: :group, account: bob)
+
+            get :index, params: { status_id: status.id, visibility: :group }
+
+            expect(response).to have_http_status(200)
+            expect(body_as_json.first[:id]).to eq bob.id.to_s
+          end
+
+          it 'returns not found if user is not a member of the private group' do
+            status = Fabricate(:status, account: user.account, visibility: :group, group: group)
+            Fabricate(:status, reblog_of_id: status.id, group: group, visibility: :group, account: user.account)
+            group.memberships.find_by!(account_id: bob.id).destroy!
+            token = Fabricate(:accessible_access_token, resource_owner_id: bob.user.id, application: app, scopes: 'read:accounts')
+            allow(controller).to receive(:doorkeeper_token) { token }
+
+            get :index, params: { status_id: status.id, visibility: :group }
+
+            expect(response).to have_http_status(404)
+          end
+        end
       end
     end
   end

@@ -3,6 +3,9 @@
 class ReblogService < BaseService
   include Authorization
   include Payloadable
+  include Redisable
+
+  DUPLICATE_REBLOG_EXPIRE_AFTER = 7.days.seconds
 
   # Reblog a status and notify its remote author
   # @param [Account] account Account to reblog from
@@ -18,7 +21,16 @@ class ReblogService < BaseService
 
     reblog = account.statuses.find_by(reblog: reblogged_status)
 
-    return reblog unless reblog.nil?
+    unless reblog.nil?
+      if options[:user_agent]
+        redis_key = "duplicate_reblogs:#{DateTime.current.to_date}"
+        redis_element_key = options[:user_agent]
+        redis.zincrby(redis_key, 1, redis_element_key)
+        redis.expire(redis_key, DUPLICATE_REBLOG_EXPIRE_AFTER)
+      end
+
+      return reblog
+    end
 
     visibility = if reblogged_status.hidden?
                    reblogged_status.visibility
@@ -26,9 +38,10 @@ class ReblogService < BaseService
                    options[:visibility] || account.user&.setting_default_privacy
                  end
 
-    reblog = account.statuses.create!(reblog: reblogged_status, text: '', visibility: visibility, rate_limit: options[:with_rate_limit])
+    reblog_params = reblogged_status.group_visibility? ? { group_id: reblogged_status.group.id } : {}
+    reblog = account.statuses.create!(reblog: reblogged_status, text: '', visibility: visibility, rate_limit: options[:with_rate_limit], **reblog_params)
 
-    PostDistributionService.new.call(reblog)
+    PostDistributionService.new.distribute_to_author_and_followers(reblog)
     ActivityPub::DistributionWorker.perform_async(reblog.id)
 
     create_notification(reblog)
@@ -43,9 +56,10 @@ class ReblogService < BaseService
 
   def create_notification(reblog)
     reblogged_status = reblog.reblog
+    type = reblogged_status.group ? :group_reblog : :reblog
 
     if reblogged_status.account.local?
-      LocalNotificationWorker.perform_async(reblogged_status.account_id, reblog.id, reblog.class.name, :reblog)
+      LocalNotificationWorker.perform_async(reblogged_status.account_id, reblog.id, reblog.class.name, type)
     elsif reblogged_status.account.activitypub? && !reblogged_status.account.following?(reblog.account)
       ActivityPub::DeliveryWorker.perform_async(build_json(reblog), reblog.account_id, reblogged_status.account.inbox_url)
     end
@@ -53,10 +67,7 @@ class ReblogService < BaseService
 
   def bump_potential_friendship(account, reblog)
     ActivityTracker.increment('activity:interactions')
-
-    return if account.following?(reblog.reblog.account_id)
-
-    PotentialFriendshipTracker.record(account.id, reblog.reblog.account_id, :reblog)
+    InteractionsTracker.new(account.id, reblog.reblog.account_id, :reblog, account.following?(reblog.reblog.account_id), reblog.group).track
   end
 
   def record_use(account, reblog)

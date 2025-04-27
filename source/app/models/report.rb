@@ -3,7 +3,6 @@
 #
 # Table name: reports
 #
-#  id                         :bigint(8)        not null, primary key
 #  status_ids                 :bigint(8)        default([]), not null, is an Array
 #  comment                    :text             default(""), not null
 #  action_taken               :boolean          default(FALSE), not null
@@ -11,11 +10,15 @@
 #  updated_at                 :datetime         not null
 #  account_id                 :bigint(8)        not null
 #  action_taken_by_account_id :bigint(8)
+#  id                         :bigint(8)        not null, primary key
 #  target_account_id          :bigint(8)        not null
 #  assigned_account_id        :bigint(8)
 #  uri                        :string
 #  forwarded                  :boolean
 #  rule_ids                   :integer          default([]), not null, is an Array
+#  message_ids                :bigint(8)        default([]), is an Array
+#  group_id                   :bigint(8)
+#  external_ad_id             :integer
 #
 
 class Report < ApplicationRecord
@@ -28,6 +31,7 @@ class Report < ApplicationRecord
   belongs_to :target_account, class_name: 'Account'
   belongs_to :action_taken_by_account, class_name: 'Account', optional: true
   belongs_to :assigned_account, class_name: 'Account', optional: true
+  belongs_to :external_ad, optional: true
 
   has_many :notes, class_name: 'ReportNote', foreign_key: :report_id, inverse_of: :report, dependent: :destroy
 
@@ -76,7 +80,6 @@ class Report < ApplicationRecord
       target_account.update(trust_level: Account::TRUST_LEVELS[:trusted])
     end
 
-    RemovalWorker.push_bulk(Status.with_discarded.discarded.where(id: status_ids).pluck(:id)) { |status_id| [status_id, { immediate: true }] }
     update!(action_taken: true, action_taken_by_account_id: acting_account.id)
   end
 

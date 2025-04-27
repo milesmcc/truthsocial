@@ -18,36 +18,43 @@ module Paperclip
     def make
       metadata = VideoMetadataExtractor.new(@file.path)
 
-      unless metadata.valid?
-        log("Unsupported file #{@file.path}")
-        return File.open(@file.path)
-      end
+      raise Paperclip::Error, "Error while transcoding #{@file.path}: unsupported file" unless metadata.valid?
 
-      update_attachment_type(metadata)
+      # This method changes the attachment type to gifv
+      # if it is a video with no sound.  Don't do that...
+      # it is stupid and it breaks unit tests.
+      # update_attachment_type(metadata)
       update_options_from_metadata(metadata)
 
       destination = Tempfile.new([@basename, @format ? ".#{@format}" : ''])
       destination.binmode
 
       @output_options = @convert_options[:output]&.dup || {}
-      @input_options  = @convert_options[:input]&.dup  || {}
+      @input_options = @convert_options[:input]&.dup || {}
 
       case @format.to_s
       when /jpg$/, /jpeg$/, /png$/, /gif$/
         @input_options['ss'] = @time
 
-        @output_options['f']       = 'image2'
+        @output_options['f'] = 'image2'
         @output_options['vframes'] = 1
-      when 'mp4'
-        @output_options['acodec'] = 'aac'
-        @output_options['strict'] = 'experimental'
+      when /mp4$/, /mov$/
+        if metadata.audio_codec != 'aac'
+          @output_options['acodec'] = 'aac'
+        end
       end
+      @output_options['strict'] = 'experimental'
 
       command_arguments, interpolations = prepare_command(destination)
 
       begin
         command = Terrapin::CommandLine.new('ffmpeg', command_arguments.join(' '), logger: Paperclip.logger)
+        timer_start = Time.zone.now
         command.run(interpolations)
+        timer_end = Time.zone.now
+        if passthrough_encoding?
+          Prometheus::ApplicationExporter.observe_duration(:video_passthrough_encoding, (timer_end - timer_start).in_milliseconds)
+        end
       rescue Terrapin::ExitStatusError => e
         raise Paperclip::Error, "Error while transcoding #{@basename}: #{e}"
       rescue Terrapin::CommandNotFoundError
@@ -59,9 +66,13 @@ module Paperclip
 
     private
 
+    def passthrough_encoding?
+      @output_options['c:v'] == 'copy'
+    end
+
     def prepare_command(destination)
-      command_arguments  = ['-nostdin']
-      interpolations     = {}
+      command_arguments = ['-nostdin']
+      interpolations = {}
       interpolation_keys = 0
 
       @input_options.each_pair do |key, value|
@@ -87,11 +98,18 @@ module Paperclip
       [command_arguments, interpolations]
     end
 
-    def update_options_from_metadata(metadata)
-      return unless @passthrough_options && @passthrough_options[:video_codecs].include?(metadata.video_codec) && @passthrough_options[:audio_codecs].include?(metadata.audio_codec) && @passthrough_options[:colorspaces].include?(metadata.colorspace)
+    def update_options_from_metadata(_metadata)
+      # always do passthrough encoding if we have the passthrough_options
+      # don't filter it by limiting it to quicktime/webm or a particular color palette
+      return unless @passthrough_options # && @passthrough_options[:video_codecs].include?(metadata.video_codec) && @passthrough_options[:audio_codecs].include?(metadata.audio_codec) && @passthrough_options[:colorspaces].include?(metadata.colorspace)
 
-      @format          = @passthrough_options[:options][:format] || @format
-      @time            = @passthrough_options[:options][:time]   || @time
+      # When doing passthrough encoding, the output format should be the same as the current format
+      # don't set it it anything else or we will be doing a conversion
+      @format = @current_format # @passthrough_options[:options][:format] || @format
+      if @format == '.qt'
+        @format = 'mp4'
+      end
+      @time = @passthrough_options[:options][:time] || @time
       @convert_options = @passthrough_options[:options][:convert_options].dup
     end
 

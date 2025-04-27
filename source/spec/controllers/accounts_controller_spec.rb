@@ -377,7 +377,7 @@ RSpec.describe AccountsController, type: :controller do
 
         it 'renders account' do
           json = body_as_json
-          expect(json).to include(:id, :type, :preferredUsername, :inbox, :publicKey, :name, :summary)
+          expect(json).to include(:id, :type, :preferredUsername, :publicKey, :name, :summary)
         end
 
         context 'in authorized fetch mode' do
@@ -411,7 +411,7 @@ RSpec.describe AccountsController, type: :controller do
 
         it 'renders account' do
           json = body_as_json
-          expect(json).to include(:id, :type, :preferredUsername, :inbox, :publicKey, :name, :summary)
+          expect(json).to include(:id, :type, :preferredUsername, :publicKey, :name, :summary)
         end
       end
 
@@ -435,7 +435,7 @@ RSpec.describe AccountsController, type: :controller do
 
         it 'renders account' do
           json = body_as_json
-          expect(json).to include(:id, :type, :preferredUsername, :inbox, :publicKey, :name, :summary)
+          expect(json).to include(:id, :type, :preferredUsername, :publicKey, :name, :summary)
         end
 
         context 'in authorized fetch mode' do
@@ -459,7 +459,7 @@ RSpec.describe AccountsController, type: :controller do
 
           it 'renders account' do
             json = body_as_json
-            expect(json).to include(:id, :type, :preferredUsername, :inbox, :publicKey, :name, :summary)
+            expect(json).to include(:id, :type, :preferredUsername, :publicKey, :name, :summary)
           end
         end
       end

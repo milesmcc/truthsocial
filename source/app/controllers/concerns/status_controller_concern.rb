@@ -38,10 +38,7 @@ module StatusControllerConcern
     descendants = cache_collection(
       @status.descendants(
         DESCENDANTS_LIMIT,
-        current_account,
-        @max_descendant_thread_id,
-        @since_descendant_thread_id,
-        DESCENDANTS_DEPTH_LIMIT
+        current_account
       ),
       Status
     )

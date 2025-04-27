@@ -8,7 +8,7 @@ RSpec.describe Api::V1::Truth::PasswordsController, type: :controller do
         token = user.send_reset_password_instructions
         post :reset_confirm, params: { password: 'beach35_b_gr8' }
       end
-  
+
       it 'returns 403' do
         expect(response).to have_http_status(403)
       end
@@ -19,10 +19,27 @@ RSpec.describe Api::V1::Truth::PasswordsController, type: :controller do
       end
     end
 
+    context 'with a previously used password' do
+      let(:password) { '123456789' }
+      before do
+        request.headers['Accept-Language'] = 'es'
+        user.password_histories.create!(encrypted_password: user.encrypted_password)
+        token = user.send_reset_password_instructions
+        post :reset_confirm, params: { reset_password_token: token, password: password }
+      end
+
+      it 'returns a 400' do
+        expect(response).to have_http_status(400)
+        expect(body_as_json[:error]).to eq I18n.t('users.previously_used_password')
+        expect(body_as_json[:error_code]).to eq 'PASSWORD_INVALID'
+        expect(body_as_json[:error_message]).to eq I18n.t('users.previously_used_password', locale: :es)
+      end
+    end
+
     context 'with a valid reset password token' do
       before do
         token = user.send_reset_password_instructions
-        post :reset_confirm, params: { reset_password_token: token, password: 'RandPaul_is_great!' }
+        post :reset_confirm, params: { reset_password_token: token, password: 'Trump_is_great!' }
       end
 
       it 'returns 200' do
@@ -31,7 +48,7 @@ RSpec.describe Api::V1::Truth::PasswordsController, type: :controller do
 
       it 'updates the user\'s password' do
         user.reload
-        expect(user.valid_password?('RandPaul_is_great!')).to be(true)
+        expect(user.valid_password?('Trump_is_great!')).to be(true)
       end
     end
   end

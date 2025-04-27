@@ -9,9 +9,8 @@ RSpec.describe PollValidator, type: :validator do
     end
 
     let(:validator) { described_class.new }
-    let(:poll) { double(options: options, expires_at: expires_at, errors: errors) }
+    let(:poll) { Fabricate(:poll, expires_at: expires_at) }
     let(:errors) { double(add: nil) }
-    let(:options) { %w(foo bar) }
     let(:expires_at) { 1.day.from_now }
 
     it 'have no errors' do
@@ -19,7 +18,7 @@ RSpec.describe PollValidator, type: :validator do
     end
 
     context 'expires just 5 min ago' do
-      let(:expires_at) { 5.minutes.from_now }
+      let(:expires_at) { 301.seconds.from_now } # 5 minutes + 1 second
       it 'not calls errors add' do
         expect(errors).not_to have_received(:add)
       end

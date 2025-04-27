@@ -23,19 +23,25 @@ RSpec.describe Follow, type: :model do
       follow.valid?
       expect(follow).to model_have_error_on_field(:target_account)
     end
+    describe 'follow limits' do
+      before do
+      stub_const('FollowLimitValidator::LIMIT', 2)
+      end
+      it 'is invalid if account already follows too many people' do
+        Follow.create!(account: alice, target_account: Fabricate(:account))
+        Follow.create!(account: alice, target_account: Fabricate(:account))
+        alice.reload
+        Procedure.process_account_following_statistics_queue
+        expect(subject).to_not be_valid
+        expect(subject).to model_have_error_on_field(:base)
+      end
 
-    it 'is invalid if account already follows too many people' do
-      alice.update(following_count: FollowLimitValidator::LIMIT)
+      it 'is valid if account is only on the brink of following too many people' do
+        Follow.create!(account: alice, target_account: Fabricate(:account))
 
-      expect(subject).to_not be_valid
-      expect(subject).to model_have_error_on_field(:base)
-    end
-
-    it 'is valid if account is only on the brink of following too many people' do
-      alice.update(following_count: FollowLimitValidator::LIMIT - 1)
-
-      expect(subject).to be_valid
-      expect(subject).to_not model_have_error_on_field(:base)
+        expect(subject).to be_valid
+        expect(subject).to_not model_have_error_on_field(:base)
+      end
     end
   end
 

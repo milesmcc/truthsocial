@@ -55,6 +55,8 @@ en:
       other: users
     user_count_before: Home to
     what_is_mastodon: What is Truth?
+  ads:
+    why_copy: We show ads for products and services we think our users might like.
   accounts:
     choices_html: "%{name}'s choices:"
     endorsements_hint: You can endorse people you follow from the web interface, and they will show up here.
@@ -126,7 +128,6 @@ en:
       disable_two_factor_authentication: Disable 2FA
       disabled: Frozen
       display_name: Display name
-      location: Location
       website: Website
       domain: Domain
       edit: Edit
@@ -256,6 +257,7 @@ en:
         enable_user: Enable User
         memorialize_account: Memorialize Account
         promote_user: Promote User
+        remove_avatar_group: Remove Group Avatar
         remove_avatar_user: Remove Avatar
         reopen_report: Reopen Report
         reset_password_user: Reset Password
@@ -263,10 +265,12 @@ en:
         sensitive_account: Mark the media in your account as sensitive
         silence_account: Silence Account
         suspend_account: Suspend Account
+        suspend_group: Suspend Group
         unassigned_report: Unassign Report
         unsensitive_account: Unmark the media in your account as sensitive
         unsilence_account: Unsilence Account
         unsuspend_account: Unsuspend Account
+        unsuspend_group: Unsuspend Group
         update_announcement: Update Announcement
         update_custom_emoji: Update Custom Emoji
         update_domain_block: Update Domain Block
@@ -299,6 +303,7 @@ en:
         enable_user_html: "%{name} enabled login for user %{target}"
         memorialize_account_html: "%{name} turned %{target}'s account into a memoriam page"
         promote_user_html: "%{name} promoted user %{target}"
+        remove_avatar_group_html: "%{name} removed the avatar for group %{target}"
         remove_avatar_user_html: "%{name} removed %{target}'s avatar"
         reopen_report_html: "%{name} reopened report %{target}"
         reset_password_user_html: "%{name} reset password of user %{target}"
@@ -306,10 +311,12 @@ en:
         sensitive_account_html: "%{name} marked %{target}'s media as sensitive"
         silence_account_html: "%{name} silenced %{target}'s account"
         suspend_account_html: "%{name} suspended %{target}'s account"
+        suspend_group_html: "%{name} suspended the group %{target}"
         unassigned_report_html: "%{name} unassigned report %{target}"
         unsensitive_account_html: "%{name} unmarked %{target}'s media as sensitive"
         unsilence_account_html: "%{name} unsilenced %{target}'s account"
         unsuspend_account_html: "%{name} unsuspended %{target}'s account"
+        unsuspend_group_html: "%{name} unsuspended the group %{target}"
         update_announcement_html: "%{name} updated announcement %{target}"
         update_custom_emoji_html: "%{name} updated emoji %{target}"
         update_domain_block_html: "%{name} updated domain block for %{target}"
@@ -463,12 +470,20 @@ en:
       suppressed: Suppressed
       title: Follow recommendations
       unsuppress: Restore follow recommendation
-    trending_truths:
-      description_html: "<strong>Follow recommendations help new users quickly find interesting content</strong>. When a user has not interacted with others enough to form personalized follow recommendations, these accounts are recommended instead. They are re-calculated on a daily basis from a mix of accounts with the highest recent engagements and highest local follower counts for a given language."
-      status: Status
-      trending: Trending
-      all: All
-      title: Trending truths
+    group_memberships:
+      title: Group members
+    group_statuses:
+      back_to_group: Back to group page
+      title: Group posts
+    groups:
+      group: Group
+      removed_avatar_msg: Successfully removed this group's avatar image
+      removed_header_msg: Successfully removed this group's header image
+      suspended_msg: Successfully suspended this group
+      suspension_irreversible: The data of this group has been irreversibly deleted. You can unsuspend the group to make it usable but it will not recover any data it previously had.
+      suspension_reversible_hint_html: The group has been suspended, and the data will be fully removed on %{date}. Until then, the group can be restored without any ill effects. If you wish to remove all of the group's data immediately, you can do so below.
+      title: Groups
+      unsuspended_msg: Successfully unsuspended this group
     instances:
       back_to_all: All
       back_to_limited: Limited
@@ -499,6 +514,87 @@ en:
         title: Moderation
       private_comment: Private comment
       public_comment: Public comment
+      rules:
+        content_illegal_activity:
+          text: Illegal activity and behavior
+          subtext: Content that depicts illegal or criminal acts, threats of violence.
+        content_intellectual_infringement:
+          text: Intellectual property infringement
+          subtext: Impersonating another account or business, infringing on intellectual property
+            rights.
+        content_sensitive_content:
+          text: Sensitive Content
+          subtext: Depictions of violence, gore, nudity.
+        content_underage_content:
+          text: Underage content
+          subtext: Sexually explicit content involving underage children.
+        content_prostitution:
+          text: Prostitution
+          subtext: Solicitation or advertising for illegal sexual activity or sex for hire.
+        content_privacy_violations:
+          text: Privacy violations
+          subtext: Violate or post content that violates a person's privacy rights.
+        content_illegal_sales:
+          text: Illegal sales
+          subtext: 'Sale of or promotion of illegal drugs, counterfeit services and goods,
+            or illegal products and services. '
+        content_doxxing:
+          text: Doxxing
+          subtext: Sharing or threatening to share the private information of an individual
+            without their consent or breach of privacy rights of others.
+        content_spam:
+          text: Spam
+          subtext: Fraudulent or malicious content or links, inauthentic engagement, repetitive
+            replies, ReTruths, or direct messages.
+        content_dislike:
+          text: I don't like this content
+          subtext: I dislike this content and/or this user is a troll.
+        account_illegal_activity:
+          text: Illegal activity and behavior
+          subtext: Content that depicts illegal or criminal acts, threats of violence.
+        account_sensitive_content:
+          text: Sensitive Content
+          subtext: Depictions of violence, gore, nudity.
+        account_spam:
+          text: SPAM
+          subtext: Fraudulent content, phishing, or content that is spam or a bot.
+        account_fake_account:
+          text: Fake Account
+          subtext: Improper use of username/account to masquerade as someone else or impersonate another person or entity that is not a parody.
+        account_intellectual_property:
+          text: Intellectual Property
+          subtext: Account name or entity infringes on intellectual property rights without
+            authorization.
+        account_underage_content:
+          text: Underage content
+          subtext: Sexually explicit content involving underage children.
+        account_prostitution:
+          text: Prostitution
+          subtext: Solicitation or advertising for illegal sexual activity or sex for hire.
+        account_privacy_violations:
+          text: Privacy violations
+          subtext: Violate or post content that violates a person's privacy rights.
+        account_troll:
+          text: Troll
+          subtext: This user is a troll and/or I dislike their content.
+        group_illegal_activity:
+          text: Illegal Activity and Behavior
+          subtext: 'This group is participating, encouraging or depicting illegal or criminal acts such as: threats, violence, incitement of violence, doxxing or harrassment.'
+        group_spam:
+          text: Spam
+          subtext: Fraudulent content, phishing or content that is spam or a bot.
+        group_impersonation:
+          text: Impersonation
+          subtext: This group is claiming to represent a person/entity that they aren't authorized to represent.
+        group_underage_content:
+          text: Underage Content
+          subtext: This group has posted sexually explicit content involving underage children.
+        group_prostitution:
+          text: Prostitution
+          subtext: This group is soliciting or advertising for illegal sexual activity or sex for hire.
+        group_privacy_violations:
+          text: Privacy Violations
+          subtext: This group has violated mine or someone else's privacy rights, including doxxing.
       title: Federation
       total_blocked_by_us: Blocked by us
       total_followed_by_them: Followed by them
@@ -840,6 +936,14 @@ en:
     hint_html: "<strong>Tip:</strong> We won't ask you for your password again for the next hour."
     invalid_password: Invalid password
     prompt: Confirm password to continue
+  chats:
+    errors:
+      creator_started: Cannot accept this chat since you started it
+      blocked_constraints: Cannot perform request due to blocked constraints
+      unfollowed_and_left_chat_by_user: This user has left the chat and no longer follows you
+      message_creation: An error occurred while creating message
+      channel_reaction: Reactions are not supported for channels
+    marketing_reply: Truth Social cannot receive direct messages. To contact us, email support@truthsocial.com!
   crypto:
     errors:
       invalid_key: is not a valid Ed25519 or Curve25519 key
@@ -900,6 +1004,22 @@ en:
       title: This page is not correct
     '503': The page could not be served due to a temporary server failure.
     noscript_html: To use the Truth web application, please enable JavaScript. Alternatively, try one of the <a href="%{apps_path}">native apps</a> for Truth for your platform.
+    api:
+      '401': This method requires an authenticated user
+      '403': This action is not allowed
+      '404': Record not found
+      '503': There was a temporary problem serving your request, please try again
+      assertion: Unable to verify assertion
+      attestation: Unable to verify attestation
+      data_fetch: Remote data could not be fetched
+      duplicate: Duplicate record
+      login_disabled: Your login is currently disabled
+      login_pending: Your login is currently pending approval
+      sms_reverification_pending: Your account is currently pending SMS verification
+      missing_email: Your login is missing a confirmed e-mail address
+      ssl: Remote SSL certificate could not be verified
+      outside_scopes: This action is outside the authorized scopes
+      unauthorized: Not authorized
   existing_username_validator:
     not_found: could not find a local user with that username
     not_found_multiple: could not find %{usernames}
@@ -923,6 +1043,10 @@ en:
     errors:
       limit: You have already featured the maximum amount of hashtags
     hint_html: "<strong>What are featured hashtags?</strong> They are displayed prominently on your public profile and allow people to browse your public posts specifically under those hashtags. They are a great tool for keeping track of creative works or long-term projects."
+  feeds:
+    errors:
+      feed_creation_limit: Feed Limit Reached. You've reached the maximum number of custom feeds. Delete a feed to add another.
+      too_many_pinned: Feed Pinned Limit Reached. You've reached the maximum number of pinned feeds. Unpin a feed to pin another.
   filters:
     contexts:
       account: Profiles
@@ -957,6 +1081,22 @@ en:
     validation_errors:
       one: Something isn't quite right yet! Please review the error below
       other: Something isn't quite right yet! Please review %{count} errors below
+  groups:
+    errors:
+      unsupported_remote_role: Moderation roles are not supported for remote users yet
+      invalid_name: Please remove invalid characters
+      group_taken: This group name is taken
+      too_many_tags: 'Validation failed: Tags cannot exceed 3'
+      group_creation_limit: You've reached the group creation threshold
+      group_membership_limit: You've reached the group membership threshold
+      invalid_group_tag: 'Validation failed: Tag is invalid'
+      group_deleted: This group no longer exists
+      pending_request_conflict: Group owner or admin has already taken action on this request
+      too_many_admins: You can assign up to %{count} admins for the group at this time.
+    members:
+      one: Member
+      other: Members
+    members_of: Members of group %{name}
   html_validator:
     invalid_markup: 'contains invalid HTML markup: %{error}'
   identity_proofs:
@@ -1023,6 +1163,31 @@ en:
       invite_pending: Invite pending
       invite_redemed: Invite accepted
     title: Invite people
+  links:
+    title:
+      default: "Are you sure you want to leave Truth Social?"
+      blocked: "The Site Ahead Contains Malware"
+      missing: "Page Not Found"
+      warning: "Warning: Potential Security Risk Ahead"
+    summary:
+      default: |
+        This link is taking you to a site outside of Truth Social
+      blocked: |
+        Attackers currently on %{url} might attempt to install dangerous programs on your device
+        that steal or delete your information (for example, photos, passwords, messages and
+        credit cards.)
+      missing: |
+        Sorry, the link you requested does not exist.
+      warning: |
+        Truth Social detected a potential security threat and did not continue to
+        %{url}. If you visit this site, attackers
+        could try to steal information like your passwords, emails, or
+        credit card details.
+    actions:
+      continue: Accept the risk and continue
+      go_back: Back to Truth Social
+      go_back_recommended: Back to Truth Social (recommended)
+      go_to_site: Go to Site
   lists:
     errors:
       limit: You have reached the maximum amount of lists
@@ -1069,6 +1234,10 @@ en:
     carry_mutes_over_text: This user moved from %{acct}, which you had muted.
     copy_account_note_text: 'This user moved from %{acct}, here were your previous notes about them:'
   notification_mailer:
+    chat:
+      subject: "New message from %{name}"
+      subject_android: "sent you a message"
+      sent_message: "Sent you a message"
     digest:
       action: View all notifications
       body: Here is a brief summary of the messages you missed since your last visit on %{since}
@@ -1079,46 +1248,112 @@ en:
       subject:
         one: "1 new notification since your last visit \U0001F418"
         other: "%{count} new notifications since your last visit \U0001F418"
+      subject_android:
+        one: "1 new notification since your last visit \U0001F418"
+        other: "%{count} new notifications since your last visit \U0001F418"
       title: In your absence...
     favourite:
       body: 'Your post was liked by %{name}:'
-      subject: "%{name} liked your post"
+      subject: "%{name} liked your Truth"
+      subject_android: "liked your Truth"
       title: New favorite
     favourite_group:
       subject: "%{name} + %{count_others} %{actor} liked your Truth"
+      subject_android: "%{name} and %{count_others} %{actor} liked your Truth"
     follow:
       body: "%{name} is now following you!"
       subject: "%{name} is now following you"
+      subject_android: "is now following you"
       title: New follower
+    group_favourite:
+      body: "%{name} liked your Truth in %{group}"
+      subject: "%{name} liked your Truth in %{group}"
+      subject_android: "liked your Truth in %{group}"
+      title: New favorite
+    group_favourite_group:
+      subject: "%{name} + %{count_others} %{actor} liked your Truth in %{group}"
+      subject_android: "%{name} and %{count_others} %{actor} liked your Truth in %{group}"
     follow_group:
       subject: "%{name} + %{count_others} %{actor} followed you"
+      subject_android: "%{name} and %{count_others} %{actor} followed you"
     follow_request:
       action: Manage follow requests
       body: "%{name} has requested to follow you"
       subject: 'Pending follower: %{name}'
+      subject_android: 'requested to follow you'
       title: New follow request
     mention:
       action: Reply
-      body: 'You were mentioned by %{name} in:'
+      body: 'You were mentioned by %{name}'
       subject: You were mentioned by %{name}
+      subject_android: "mentioned you in a Truth"
       title: New mention
     mention_group:
       subject: "%{name} + %{count_others} %{actor} mentioned you"
+      subject_android: "%{name} and %{count_others} %{actor} mentioned you"
+    group_mention:
+      action: Reply
+      body: 'You were mentioned by %{name} in %{group}'
+      subject: 'You were mentioned by %{name} in %{group}'
+      subject_android: 'mentioned you in %{group}'
+      title: New mention
+    group_mention_group:
+      subject: "%{name} + %{count_others} %{actor} mentioned you"
+      subject_android: "%{name} and %{count_others} %{actor} mentioned you"
     poll:
       subject: A poll by %{name} has ended
+      subject_android: 'concluded a poll'
     reblog:
       body: 'Your post was ReTruthed by %{name}:'
-      subject: "%{name} ReTruthed your post"
+      subject: "%{name} ReTruthed your Truth"
+      subject_android: "ReTruthed your Truth"
       title: New ReTruth
     reblog_group:
       subject: "%{name} + %{count_others} %{actor} ReTruthed your Truth"
+      subject_android: "%{name} and %{count_others} %{actor} ReTruthed your Truth"
+    group_delete:
+      body: "%{group} has been deleted"
+      subject: "%{group} has been deleted"
+      subject_android: "has been deleted"
+      title: Group Deleted
+    group_approval:
+      body: "%{group} approved your request"
+      subject: "%{group} approved your request"
+      subject_android: "approved your request"
+      title: Accepted to group
+    group_reblog:
+      body: "%{name} ReTruthed your Truth from %{group}"
+      subject: "%{name} ReTruthed your Truth from %{group}"
+      subject_android: "ReTruthed your Truth from %{group}"
+      title: New ReTruth
+    group_reblog_group:
+      subject: "%{name} + %{count_others} %{actor} ReTruthed your group Truth"
+      subject_android: "%{name} and %{count_others} %{actor} ReTruthed your group Truth"
+    group_request:
+      body: "You have a new member request for %{group}"
+      subject: "You have a new member request for %{group}"
+      subject_android: "you have a new member request"
+      title: New member request
+    group_promoted:
+      body: You are now an admin for %{group}
+      subject: You are now an admin for %{group}
+      subject_android: you are now an admin
+      title: You're an admin
+    group_demoted:
+      body: You are no longer an admin for %{group}
+      subject: You are no longer an admin for %{group}
+      subject_android: you are no longer admin
+      title: You're no longer an admin
     status:
       subject: "%{name} just posted"
+      subject_android: "just posted"
     user_approved:
       edit_profile_action: Go to profile
       edit_profile_step: Lastly, make sure to customize your profile by uploading an avatar, header, changing your display name and more. If you’d like to review new followers before they’re allowed to follow you, you can lock your account.
-      explanation: We are very excited to welcome you to our Truth Seeking community. We believe in free expression and encourage all viewpoints as we do not discriminate against political ideology.
-      extra_step: Also, a friendly reminder, we are a new platform, and we are still fixing many bugs in our technology. We promise we are working as hard as we can to make things better as fast as possible! Thanks!
+      explanation: Let us be the first to welcome you to Truth Social! We're thrilled you've joined our growing free speech community and support our goal to keep the Internet open for everyone.
+      extra_step: If you ever have a question about how to use the app, please visit our %{help_center_link} or feel free to email our Support Team at %{mailto_support}. Happy Truthing!
+      signoff: The Truth Social Team
+      help_center: Help Center
       final_action: Start posting
       final_step: 'Start posting! Even without followers your public posts may be seen by others, for example on the local timeline and in hashtags. You may want to introduce yourself on the #introductions hashtag.'
       full_handle: Your full handle
@@ -1126,16 +1361,16 @@ en:
       review_preferences_action: Change preferences
       review_preferences_step: Make sure to set your preferences, such as which emails you'd like to receive, or what privacy level you’d like your posts to default to. If you don’t have motion sickness, you could choose to enable GIF autoplay.
       subject: "Your wait is over! Tap here to start using Truth Social."
-      web:
-        subject: "Welcome to Truth"
+      subject_android: "Your wait is over! Tap here to start using Truth Social."
       tip_federated_timeline: The federated timeline is a firehose view of the Truth network. But it only includes people your neighbours are subscribed to, so it's not complete.
       tip_following: You follow your server's admin(s) by default. To find more interesting people, check the local and federated timelines.
       tip_local_timeline: The local timeline is a firehose view of people on %{instance}. These are your immediate neighbours!
       tip_mobile_webapp: If your mobile browser offers you to add Truth to your homescreen, you can receive push notifications. It acts like a native app in many ways!
       tips: Tips
-      title: Welcome to Truth Social, %{name}!
+      title: Welcome to Truth Social, @%{name}!
     verify_sms_prompt:
       subject: Your account is now active on Truth Social! Upgrade to the latest version and join us now!
+      subject_android: Your account is now active on Truth Social! Upgrade to the latest version and join us now!
   notifications:
     email_events: Events for e-mail notifications
     email_events_hint: 'Select events that you want to receive notifications for:'
@@ -1159,6 +1394,7 @@ en:
     manual_instructions: 'If you can''t scan the QR code and need to enter it manually, here is the plain-text secret:'
     setup: Set up
     wrong_code: The entered code was invalid!
+    invalid_code: "The code doesn't match. Please try again."
   pagination:
     newer: Newer
     next: Next
@@ -1303,11 +1539,20 @@ en:
       one: 'contained a disallowed hashtag: %{tags}'
       other: 'contained the disallowed hashtags: %{tags}'
     errors:
-      in_reply_not_found: The post you are trying to reply to does not appear to exist.
+      not_permitted_to_post: You cannot post to this group.
+      in_reply_not_found: The Truth you are trying to reply to does not appear to exist.
+      mention_mismatch: Unable to post your Truth at this time.
+    group_errors:
+      invalid_group_id: Invalid group identifier.
+      invalid_membership: Only members may post to this group.
+      invalid_reply: The post being replied to is not in this group.
+      invalid_visibility: You cannot post to this group.
     language_detection: Automatically detect language
     open_in_web: Open in web
     over_character_limit: character limit of %{max} exceeded
     pin_errors:
+      group: Group posts cannot be pinned
+      group_ownership: Only group owners can pin posts
       limit: You have already pinned the maximum number of posts
       ownership: Someone else's post cannot be pinned
       private: Non-public posts cannot be pinned
@@ -1328,6 +1573,7 @@ en:
     title: '%{name}: "%{quote}"'
     visibilities:
       direct: Direct
+      group: Group
       private: Followers-only
       private_long: Only show to followers
       public: Public
@@ -1458,12 +1704,12 @@ en:
       subject: Please confirm attempted sign in
       title: Sign in attempt
     status_removed:
-      explanation: You have a Truth that has been removed for violating Truth Social community guidelines.
-      title: Your Truth has been removed
-      subject: Your Truth has been removed
+      explanation: We use artificial intelligence (AI) to assist our hardworking moderators, and some Truths are flagged for deletion or marked “sensitive” by AI. While the AI we use is very good, it is not error-proof. Assisted by technology, our moderators use their best judgment to ensure compliance with our Terms of Service. Please give our team time to review your Truth to determine whether it violates our Terms of Service. After a thorough review, we will reinstate the Truth or uphold its removal.
+      title: Your Truth was flagged for review
+      subject: Your Truth was flagged for review
     warning:
       explanation:
-        ban_html: After careful review we have decided to delete your account permanently due to Truth social community guidelines violations. If you feel we have made an error, you can file an appeal with %{email}.
+        ban_html: Your account has been banned for violating our Terms of Service. Indefinite bans are a rare and severe sanction, and are generally reserved for the most egregious violations of our Terms of Service. If you feel our decision to ban your account was unjust, immoral, or downright wrong, we encourage you to submit an appeal. Please send an email to %{email}. In the subject line, please write "@Appeal," along with your username. Our team will review your ban appeal at our earliest convenience. After careful review, we will reverse or uphold the ban.
         disable_html: You can no longer login to your account or use it in any other way, but your profile and other data remains intact.
         sensitive_html: Your uploaded media files and linked media will be treated as sensitive.
         silence_html: You can still use your account but only people who are already following you will see your posts on this server, and you may be excluded from various public listings. However, others may still manually follow you.
@@ -1502,6 +1748,8 @@ en:
     invalid_otp_token: Invalid two-factor code
     invalid_sign_in_token: Invalid security code
     otp_lost_help_html: If you lost access to both, you may get in touch with %{email}
+    previously_used_password: Please use a password you have not previously used.
+    password_mismatch: Password and password confirmation do not match.
     seamless_external_login: You are logged in via an external service, so password and e-mail settings are not available.
     signed_in_as: 'Signed in as:'
     suspicious_sign_in_confirmation: You appear to not have logged in from this device before, and you haven't logged in for a while, so we're sending a security code to your e-mail address to confirm that it's you.
@@ -1525,3 +1773,7 @@ en:
     not_supported: This browser doesn't support security keys
     otp_required: To use security keys please enable two-factor authentication first.
     registered_on: Registered on %{date}
+  activerecord:
+    attributes:
+      group:
+        slug: 'Display name'

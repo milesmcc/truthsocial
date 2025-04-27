@@ -121,13 +121,27 @@ RSpec.describe FollowService, type: :service do
         expect(sender.muting_reblogs?(bob)).to be false
       end
     end
+
+    describe 'notifications' do
+      let(:bob) { Fabricate(:user).account }
+
+      it 'are sent by default' do
+        subject.call(sender, bob)
+        expect(Notification.where(activity_type: Follow.name, account_id: bob.id).count).to eq(1)
+      end
+
+      it 'can be skipped' do
+        subject.call(sender, bob, skip_notification: true)
+        expect(Notification.where(activity_type: Follow.name, account_id: bob.id).count).to eq(0)
+      end
+    end
   end
 
   context 'remote ActivityPub account' do
     let(:bob) { Fabricate(:user, account: Fabricate(:account, username: 'bob', domain: 'example.com', protocol: :activitypub, inbox_url: 'http://example.com/inbox')).account }
 
     before do
-      stub_request(:post, "http://example.com/inbox").to_return(:status => 200, :body => "", :headers => {})
+      stub_request(:post, 'http://example.com/inbox').to_return(status: 200, body: '', headers: {})
       subject.call(sender, bob)
     end
 
@@ -153,8 +167,8 @@ RSpec.describe FollowService, type: :service do
 
         subject.call(sender, bob)
 
-        expect(Sidekiq::Queues['foo'].size).to eq(1)
-        expect(Sidekiq::Queues['bar'].size).to eq(1)
+        expect(Sidekiq::Queues['foo'].size).to eq(2)
+        expect(Sidekiq::Queues['bar'].size).to eq(2)
         expect(Sidekiq::Queues['foo'].first['class']).to eq(InvalidateFollowCacheWorker.name)
 
         Sidekiq::Worker.drain_all
@@ -165,4 +179,51 @@ RSpec.describe FollowService, type: :service do
     end
   end
 
+  describe 'interactions score' do
+    let(:bob) { Fabricate(:user, email: 'bob@example.com', account: Fabricate(:account, username: 'bob')) }
+    let(:dalv) { Fabricate(:user, email: 'dalv@example.com', account: Fabricate(:account, username: 'dalv')) }
+
+    before do
+      Redis.current.zincrby("interactions:#{sender.id}", 10, bob.account.id)
+      Redis.current.zincrby("interactions:#{sender.id}", 10, dalv.account.id)
+      subject.call(sender, dalv.account)
+    end
+
+    it 'removes interactions record' do
+      expect(Redis.current.zrange("interactions:#{sender.id}", 0, -1)).to eq [bob.account.id.to_s]
+    end
+  end
+
+  context 'avatars carousel cache' do
+    let(:bob) { Fabricate(:user, email: 'bob@example.com', account: Fabricate(:account, username: 'bob')) }
+    let(:dalv) { Fabricate(:user, email: 'dalv@example.com', account: Fabricate(:account, username: 'dalv')) }
+    let(:alice) { Fabricate(:user, email: 'alice@example.com', account: Fabricate(:account, username: 'alice')) }
+
+    describe 'when a user follows less than 10 accounts' do
+      before do
+        Redis.current.set("avatars_carousel_list_#{bob.account.id}", [dalv.account.id, alice.account.id])
+        subject.call(bob.account, dalv.account)
+      end
+
+      it 'purges carousel cache' do
+        expect(Redis.current.get("avatars_carousel_list_#{bob.account.id}")).to be_nil
+      end
+    end
+
+    describe 'when a user follows more than 10 accounts' do
+      before do
+        Redis.current.set("avatars_carousel_list_#{bob.account.id}", [dalv.account.id, alice.account.id])
+        15.times do
+          bob.account.follow!(Fabricate(:account))
+        end
+        Procedure.process_account_following_statistics_queue
+        expect(bob.account.following_count).to eq(15)
+        subject.call(bob.account, alice.account)
+      end
+
+      it 'it doesnt purge carousel cache' do
+        expect(Redis.current.get("avatars_carousel_list_#{bob.account.id}")).to_not be_nil
+      end
+    end
+  end
 end

@@ -15,6 +15,8 @@
 #
 
 class Notification < ApplicationRecord
+  self.primary_key = :id
+
   self.inheritance_column = nil
 
   include Paginable
@@ -27,7 +29,7 @@ class Notification < ApplicationRecord
     'FollowRequest' => :follow_request,
     'Favourite'     => :favourite,
     'Poll'          => :poll,
-    'User'          => :user_approved,
+    'User'          => :user_approved
   }.freeze
 
   TYPES = %i(
@@ -41,10 +43,27 @@ class Notification < ApplicationRecord
     poll
     user_approved
     verify_sms_prompt
+    chat
+    chat_message
+    chat_message_deleted
     mention_group
     reblog_group
     follow_group
     favourite_group
+    group_favourite
+    group_favourite_group
+    group_reblog
+    group_reblog_group
+    group_mention
+    group_mention_group
+    group_approval
+    group_delete
+    group_role
+    group_request
+    group_request_group
+    group_accepted
+    group_promoted
+    group_demoted
   ).freeze
 
   TARGET_STATUS_INCLUDES_BY_TYPE = {
@@ -59,6 +78,12 @@ class Notification < ApplicationRecord
     poll: [poll: :status],
     user_approved: :user,
     verify_sms_prompt: :user,
+    group_favourite: [favourite: :status],
+    group_favourite_group: [favourite: :status],
+    group_reblog: [status: :reblog],
+    group_reblog_group: [status: :reblog],
+    group_mention: [mention: :status],
+    group_mention_group: [mention: :status]
   }.freeze
 
   attr_accessor :passed_from_account
@@ -75,20 +100,12 @@ class Notification < ApplicationRecord
   belongs_to :favourite,      foreign_key: 'activity_id', optional: true
   belongs_to :poll,           foreign_key: 'activity_id', optional: true
   belongs_to :user,           foreign_key: 'activity_id', optional: true
+  belongs_to :group,           foreign_key: 'activity_id', optional: true
+  belongs_to :group_membership_request,           foreign_key: 'activity_id', optional: true
 
   validates :type, inclusion: { in: TYPES }
 
   scope :without_suspended, -> { joins(:from_account).merge(Account.without_suspended) }
-
-  scope :browserable, ->(exclude_types = [], account_id = nil) {
-    types = TYPES - exclude_types.map(&:to_sym)
-
-    if account_id.nil?
-      where(type: types)
-    else
-      where(type: types, from_account_id: account_id)
-    end
-  }
 
   def type
     @type ||= (super || LEGACY_TYPE_CLASS_MAP[activity_type]).to_sym
@@ -96,20 +113,48 @@ class Notification < ApplicationRecord
 
   def target_status
     case type
-    when :status, :favourite_group, :mention_group, :reblog_group
+    when :status, :favourite_group, :mention_group, :reblog_group, :group_favourite_group, :group_mention_group, :group_reblog_group
       status
-    when :reblog
+    when :reblog, :group_reblog
       status&.reblog
-    when :favourite
+    when :favourite, :group_favourite
       favourite&.status
-    when :mention
+    when :mention, :group_mention
       mention&.status
     when :poll
       poll&.status
     end
   end
 
+  def target_group
+    case type
+    when :group_approval, :group_promoted, :group_demoted, :group_delete
+      group
+    when :group_request
+      group_membership_request
+    end
+  end
+
   class << self
+    def browserable(types: [], exclude_types: [], from_account_id: nil)
+      requested_types = begin
+        if types.empty?
+          TYPES
+        else
+          types.map(&:to_sym) & TYPES
+        end
+      end
+
+      exclude_types_with_groups = exclude_types.clone
+      exclude_types.each { |n| exclude_types_with_groups << "#{n}_group"}
+      requested_types -= exclude_types_with_groups.map(&:to_sym)
+
+      all.tap do |scope|
+        scope.merge!(where(from_account_id: from_account_id)) if from_account_id.present?
+        scope.merge!(where(type: requested_types)) unless requested_types.size == TYPES.size
+      end
+    end
+
     def preload_cache_collection_target_statuses(notifications, &_block)
       notifications.group_by(&:type).each do |type, grouped_notifications|
         associations = TARGET_STATUS_INCLUDES_BY_TYPE[type]
@@ -130,13 +175,13 @@ class Notification < ApplicationRecord
         cached_status = cached_statuses_by_id[notification.target_status.id]
 
         case notification.type
-        when :status, :favourite_group, :mention_group, :reblog_group
+        when :status, :favourite_group, :mention_group, :reblog_group, :group_favourite_group, :group_mention_group, :group_reblog_group
           notification.status = cached_status
-        when :reblog
+        when :reblog, :group_reblog
           notification.status.reblog = cached_status
-        when :favourite
+        when :favourite, :group_favourite
           notification.favourite.status = cached_status
-        when :mention
+        when :mention, :group_mention
           notification.mention.status = cached_status
         when :poll
           notification.poll.status = cached_status
@@ -144,6 +189,10 @@ class Notification < ApplicationRecord
       end
 
       notifications
+    end
+
+    def exclude_self_statuses(notifications)
+      notifications.delete_if { |n| n.target_status&.visibility == 'self' }
     end
   end
 
@@ -166,7 +215,22 @@ class Notification < ApplicationRecord
         self.from_account_id = activity&.users&.first&.account_id
       when 'User'
         self.from_account_id = activity&.account_id
+      when 'ChatMessage'
+        self.from_account_id = activity&.created_by_account_id
+      when 'Group'
+        self.from_account_id = set_by_notification_type
+      when 'GroupMembershipRequest'
+        self.from_account_id = activity&.account&.id
       end
+    end
+  end
+
+  def set_by_notification_type
+    case type
+    when :group_delete
+      activity&.owner_account&.id
+    else
+      activity&.owner_account&.id
     end
   end
 end

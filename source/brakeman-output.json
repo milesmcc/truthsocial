@@ -1,11 +1,11 @@
 {
   "scan_info": {
-    "app_path": "/builds/tmediatech/social-v1",
+    "app_path": "/Users/markmorales/Code/social-v1_groups",
     "rails_version": "6.1.3.2",
     "security_warnings": 0,
-    "start_time": "2022-06-08 13:18:11 +0000",
-    "end_time": "2022-06-08 13:18:29 +0000",
-    "duration": 18.243194352,
+    "start_time": "2023-07-17 16:03:50 -0500",
+    "end_time": "2023-07-17 16:04:07 -0500",
+    "duration": 17.111335,
     "checks_performed": [
       "BasicAuth",
       "BasicAuthTimingAttack",
@@ -80,9 +80,9 @@
       "XMLDoS",
       "YAMLParsing"
     ],
-    "number_of_controllers": 211,
-    "number_of_models": 122,
-    "number_of_templates": 202,
+    "number_of_controllers": 286,
+    "number_of_models": 173,
+    "number_of_templates": 205,
     "ruby_version": "2.7.2",
     "brakeman_version": "5.0.1"
   },
@@ -97,7 +97,7 @@
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/report.rb",
-      "line": 118,
+      "line": 121,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "Admin::ActionLog.from(\"(#{[Admin::ActionLog.where(:target_type => \"Report\", :target_id => id, :created_at => ((created_at..updated_at))).unscope(:order), Admin::ActionLog.where(:target_type => \"Account\", :target_id => target_account_id, :created_at => ((created_at..updated_at))).unscope(:order), Admin::ActionLog.where(:target_type => \"Status\", :target_id => status_ids, :created_at => ((created_at..updated_at))).unscope(:order)].map do\n \"(#{query.to_sql})\"\n end.join(\" UNION ALL \")}) AS admin_action_logs\")",
       "render_path": null,
@@ -110,13 +110,32 @@
       "confidence": "High"
     },
     {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "0a8e1b95121cc27c9eccfa472297b9c738b55e8511a902dfb0cd6c0861cf4a29",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/groups_controller.rb",
+      "line": 186,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.permit(:role, :account_ids => ([]), :tags => ([]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::V1::GroupsController",
+        "method": "resource_params"
+      },
+      "user_input": ":role",
+      "confidence": "Medium"
+    },
+    {
       "warning_type": "SQL Injection",
       "warning_code": 0,
       "fingerprint": "19df3740b8d02a9fe0eb52c939b4b87d3a2a591162a6adfa8d64e9c26aeebe6d",
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/status.rb",
-      "line": 107,
+      "line": 131,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "result.joins(\"INNER JOIN statuses_tags t#{id} ON t#{id}.status_id = statuses.id AND t#{id}.tag_id = #{id}\")",
       "render_path": null,
@@ -148,6 +167,25 @@
       "confidence": "High"
     },
     {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "3373360caca1c1ecad29d946fe605fb60d1ae163d68685c01faee2e86b7ef160",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/status.rb",
+      "line": 503,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "select(\"*\").from(\"(select s.* from statuses s\\n                        inner join conversations c on c.id = s.conversation_id\\n                        inner join conversation_mutes cm on cm.conversation_id = c.id\\n                        where cm.account_id = #{account_id} and in_reply_to_id is null) as statuses\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Status",
+        "method": "muted_conversations_for_account"
+      },
+      "user_input": "account_id",
+      "confidence": "Weak"
+    },
+    {
       "warning_type": "Redirect",
       "warning_code": 18,
       "fingerprint": "5fad11cd67f905fab9b1d5739d01384a1748ebe78c5af5ac31518201925265a7",
@@ -173,7 +211,7 @@
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/account.rb",
-      "line": 542,
+      "line": 611,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "find_by_sql([\"          WITH first_degree AS (\\n            SELECT target_account_id\\n            FROM follows\\n            WHERE account_id = ?\\n            UNION ALL\\n            SELECT ?\\n          )\\n          SELECT\\n            accounts.*,\\n            (count(f.id) + 1) * ts_rank_cd(#{textsearch}, #{query}, 32) AS rank\\n          FROM accounts\\n          LEFT OUTER JOIN follows AS f ON (accounts.id = f.account_id AND f.target_account_id = ?)\\n          WHERE accounts.id IN (SELECT * FROM first_degree)\\n            AND #{query} @@ #{textsearch}\\n            AND accounts.suspended_at IS NULL\\n            AND accounts.moved_to_account_id IS NULL\\n          GROUP BY accounts.id\\n          ORDER BY rank DESC\\n          LIMIT ? OFFSET ?\\n\".squish, account.id, account.id, account.id, limit, offset])",
       "render_path": null,
@@ -192,7 +230,7 @@
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/status.rb",
-      "line": 112,
+      "line": 136,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "result.joins(\"LEFT OUTER JOIN statuses_tags t#{id} ON t#{id}.status_id = statuses.id AND t#{id}.tag_id = #{id}\")",
       "render_path": null,
@@ -230,7 +268,7 @@
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/account.rb",
-      "line": 511,
+      "line": 580,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "find_by_sql([\"        SELECT\\n          accounts.*,\\n          ts_rank_cd(#{textsearch}, #{query}, 32) AS rank\\n        FROM accounts\\n        WHERE #{query} @@ #{textsearch}\\n          AND accounts.suspended_at IS NULL\\n          AND accounts.moved_to_account_id IS NULL\\n        ORDER BY rank DESC\\n        LIMIT ? OFFSET ?\\n\".squish, limit, offset])",
       "render_path": null,
@@ -260,6 +298,25 @@
       },
       "user_input": "SecureRandom.hex(16)",
       "confidence": "Medium"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "ab5035dd1a9f8c3a8d92fb2c37e8fe86fede4f87c91b71aa32e89c9eede602fc",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/notifications_controller.rb",
+      "line": 82,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.permit(:account_id, :types => ([]), :exclude_types => ([]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::V1::NotificationsController",
+        "method": "browserable_params"
+      },
+      "user_input": ":account_id",
+      "confidence": "High"
     },
     {
       "warning_type": "Redirect",
@@ -300,13 +357,32 @@
       "confidence": "High"
     },
     {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "d6003f47b2ac2aa2a8c7e56d8a78d9490999ec6c6e0b82c353575084f8bd47cd",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/reports_controller.rb",
+      "line": 84,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.permit(:account_id, :comment, :forward, :group_id, :external_ad_url, :external_ad_media_url, :external_ad_description, :status_ids => ([]), :rule_ids => ([]), :message_ids => ([]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::V1::ReportsController",
+        "method": "report_params"
+      },
+      "user_input": ":account_id",
+      "confidence": "High"
+    },
+    {
       "warning_type": "SQL Injection",
       "warning_code": 0,
       "fingerprint": "e21d8fee7a5805761679877ca35ed1029c64c45ef3b4012a30262623e1ba8bb9",
       "check_name": "SQL",
       "message": "Possible SQL injection",
       "file": "app/models/account.rb",
-      "line": 558,
+      "line": 627,
       "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
       "code": "find_by_sql([\"          SELECT\\n            accounts.*,\\n            (count(f.id) + 1) * ts_rank_cd(#{textsearch}, #{query}, 32) AS rank\\n          FROM accounts\\n          LEFT OUTER JOIN follows AS f ON (accounts.id = f.account_id AND f.target_account_id = ?) OR (accounts.id = f.target_account_id AND f.account_id = ?)\\n          WHERE #{query} @@ #{textsearch}\\n            AND accounts.suspended_at IS NULL\\n            AND accounts.moved_to_account_id IS NULL\\n          GROUP BY accounts.id\\n          ORDER BY rank DESC\\n          LIMIT ? OFFSET ?\\n\".squish, account.id, account.id, limit, offset])",
       "render_path": null,
@@ -317,31 +393,12 @@
       },
       "user_input": "textsearch",
       "confidence": "Medium"
-    },
-    {
-      "warning_type": "Mass Assignment",
-      "warning_code": 105,
-      "fingerprint": "efa3a1b56f8c87aabd679156a2d5fd8185d469562361fb9ca8e5b478ed909906",
-      "check_name": "PermitAttributes",
-      "message": "Potentially dangerous key allowed for mass assignment",
-      "file": "app/controllers/api/v1/reports_controller.rb",
-      "line": 45,
-      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
-      "code": "params.permit(:account_id, :comment, :forward, :status_ids => ([]), :rule_ids => ([]))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Api::V1::ReportsController",
-        "method": "report_params"
-      },
-      "user_input": ":account_id",
-      "confidence": "High"
     }
   ],
   "errors": [
 
   ],
   "obsolete": [
-
+    "a9c222f356d8b4b673445f266f86e6bfce87df4e97a25ac36407367ee1269bf4"
   ]
 }

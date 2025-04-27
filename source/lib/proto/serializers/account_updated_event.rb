@@ -1,10 +1,6 @@
 # frozen_string_literal: true
-require "./lib/proto/account_updated_pb.rb"
-
 class AccountUpdatedEvent
   include RoutingHelper
-
-  EVENT_KEY = "truth_events:v1:account:updated".freeze
 
   def initialize(account, fields_changed)
     @account = account

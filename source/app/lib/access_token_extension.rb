@@ -3,6 +3,8 @@
 module AccessTokenExtension
   extend ActiveSupport::Concern
 
+  include Paginable
+
   included do
     after_commit :push_to_streaming_api
   end

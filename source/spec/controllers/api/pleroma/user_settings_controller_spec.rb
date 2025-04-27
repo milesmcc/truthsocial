@@ -17,7 +17,7 @@ RSpec.describe Api::Pleroma::UserSettingsController, type: :controller do
         post :change_password, params: { password: '123456789', new_password: new_password, new_password_confirmation: new_password }
       end
 
-      let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id) }
+      let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'write') }
       let(:new_password) { 'testfoobar' }
 
       describe 'POST #change_password' do
@@ -28,6 +28,10 @@ RSpec.describe Api::Pleroma::UserSettingsController, type: :controller do
         it 'updated the users password' do
           user.reload
           expect(user.valid_password?(new_password)).to be(true)
+        end
+
+        it 'keeps the user logged in to their current session' do
+          expect(controller.current_user_id).not_to be_nil
         end
       end
     end
@@ -47,18 +51,39 @@ RSpec.describe Api::Pleroma::UserSettingsController, type: :controller do
       end
     end
 
+    context 'with a previously used password' do
+      let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'write') }
+      let(:new_password) { '123456789' }
+
+      before do
+        request.headers['Accept-Language'] = 'es'
+        post :change_password, params: { password: new_password, new_password: new_password, new_password_confirmation: new_password }
+      end
+
+      describe 'POST #change_password' do
+        it 'returns http forbidden' do
+          expect(response).to have_http_status(400)
+          expect(body_as_json[:error]).to eq I18n.t('users.previously_used_password')
+          expect(body_as_json[:error_code]).to eq 'PASSWORD_INVALID'
+          expect(body_as_json[:error_message]).to eq I18n.t('users.previously_used_password', locale: :es)
+        end
+      end
+    end
+
     context 'with a new passwords that don\'t match' do
       before do
         post :change_password, params: { password: '123456789', new_password: new_password, new_password_confirmation: 'bad_password' }
       end
 
-      let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id) }
+      let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'write') }
       let(:new_password) { 'testfoobar' }
 
       describe 'POST #change_password' do
         it 'returns http forbidden' do
           expect(response).to have_http_status(400)
           expect(body_as_json[:error]).to eq('Password and password confirmation do not match.')
+          expect(body_as_json[:error_code]).to eq('PASSWORD_MISMATCH')
+          expect(body_as_json[:error_message]).to eq('Password and password confirmation do not match.')
         end
       end
     end
@@ -72,7 +97,7 @@ RSpec.describe Api::Pleroma::UserSettingsController, type: :controller do
       allow(UserMailer).to receive(:confirmation_instructions).and_return(double('email', deliver_later: nil))
     end
 
-    let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id) }
+    let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'write') }
     let(:new_email) { 'lets.go@brandon.com' }
 
     context 'good email' do
@@ -108,7 +133,7 @@ RSpec.describe Api::Pleroma::UserSettingsController, type: :controller do
   describe 'POST #delete_account' do
     let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'bob')) }
 
-    let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id) }
+    let(:token) { Fabricate(:accessible_access_token, resource_owner_id: user.id, scopes: 'write') }
 
     context 'with correct password' do
       before do

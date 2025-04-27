@@ -12,8 +12,9 @@
 
 class Favourite < ApplicationRecord
   include Paginable
+  extend Queriable
 
-  update_index('statuses#status', :status)
+  update_index('statuses', :status)
 
   belongs_to :account, inverse_of: :favourites
   belongs_to :status,  inverse_of: :favourites
@@ -24,19 +25,5 @@ class Favourite < ApplicationRecord
 
   before_validation do
     self.status = status.reblog if status&.reblog?
-  end
-
-  after_create :increment_cache_counters
-  after_destroy :decrement_cache_counters
-
-  private
-
-  def increment_cache_counters
-    status&.increment_count!(:favourites_count)
-  end
-
-  def decrement_cache_counters
-    return if association(:status).loaded? && status.marked_for_destruction?
-    status&.decrement_count!(:favourites_count)
   end
 end

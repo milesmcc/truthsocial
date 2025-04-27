@@ -1,9 +1,7 @@
 # frozen_string_literal: true
-require "./lib/proto/card_joined_pb.rb"
 
 class CardJoinedEvent
   include RoutingHelper
-  EVENT_KEY = "truth_events:v1:card:joined".freeze
 
   def initialize(card)
     @card = card

@@ -19,6 +19,54 @@ RSpec.describe Oauth::AuthorizationsController, type: :controller do
       end
     end
 
+    context 'retrieves token' do
+      let!(:user) { Fabricate(:user) }
+
+      scenario 'auth ok with email/password' do
+        client = OAuth2::Client.new(app.uid, app.secret) do |b|
+          b.request :url_encoded
+          b.adapter :rack, Rails.application
+        end
+        token = client.password.get_token(user.email, user.password)
+        expect(token).not_to be_expired
+      end
+
+      scenario 'auth ok with email and extraneous whitespace' do
+        client = OAuth2::Client.new(app.uid, app.secret) do |b|
+          b.request :url_encoded
+          b.adapter :rack, Rails.application
+        end
+        token = client.password.get_token(" #{user.email} ", user.password)
+        expect(token).not_to be_expired
+      end
+
+      scenario 'auth ok with username/password without @' do
+        client = OAuth2::Client.new(app.uid, app.secret) do |b|
+          b.request :url_encoded
+          b.adapter :rack, Rails.application
+        end
+        token = client.password.get_token(" #{user.account.username} ", user.password)
+        expect(token).not_to be_expired
+      end
+
+      scenario 'auth ok with username/password with @' do
+        client = OAuth2::Client.new(app.uid, app.secret) do |b|
+          b.request :url_encoded
+          b.adapter :rack, Rails.application
+        end
+        token = client.password.get_token(" @#{user.account.username} ", user.password)
+        expect(token).not_to be_expired
+      end
+
+      scenario 'auth nok' do
+        client = OAuth2::Client.new(app.uid, app.secret) do |b|
+          b.request :url_encoded
+          b.adapter :rack, Rails.application
+        end
+        expect {client.password.get_token(user.email, "#{user.password} ")}.to raise_error(OAuth2::Error)
+      end
+    end
+
     context 'when signed in' do
       let!(:user) { Fabricate(:user) }
 
@@ -40,7 +88,7 @@ RSpec.describe Oauth::AuthorizationsController, type: :controller do
 
       context 'when app is already authorized' do
         before do
-          Doorkeeper::AccessToken.find_or_create_for(
+          OauthAccessToken.find_or_create_for(
             application: app,
             resource_owner: user.id,
             scopes: app.scopes,

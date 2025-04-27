@@ -33,9 +33,11 @@ class Formatter
     linkable_accounts = get_linkable_accounts(status)
     linkable_accounts << status.account
 
+    external_links = options[:external_links] ? { external_links: options[:external_links].index_by(&:url) } : {}
+
     html = raw_content
     html = "RT @#{prepend_reblog} #{html}" if prepend_reblog
-    html = encode_and_link_urls(html, linkable_accounts)
+    html = encode_and_link_urls(html, linkable_accounts, external_links)
     html = encode_custom_emojis(html, status.emojis, options[:autoplay]) if options[:custom_emojify]
     html = simple_format(html, {}, sanitize: false)
     html = quotify(html, status) if status.quote? && !options[:escape_quotify]
@@ -103,6 +105,21 @@ class Formatter
     html.html_safe # rubocop:disable Rails/OutputSafety
   end
 
+  def format_chat_message(message)
+    linkable_usernames = []
+
+    message.scan(Account::MENTION_RE).each do |match|
+      username = match[1]
+      linkable_usernames << username
+    end
+
+    linkable_accounts = Account.ci_find_by_usernames(linkable_usernames).to_a
+
+    html = encode_and_link_urls(message, linkable_accounts)
+    html = simple_format(html, {}, sanitize: false)
+    html.html_safe # rubocop:disable Rails/OutputSafety
+  end
+
   def linkify(text)
     html = encode_and_link_urls(text)
     html = simple_format(html, {}, sanitize: false)
@@ -155,7 +172,8 @@ class Formatter
   def count_tag_nesting(tag)
     if tag[1] == '/' then -1
     elsif tag[-2] == '/' then 0
-    else 1
+    else
+      1
     end
   end
 
@@ -282,8 +300,11 @@ class Formatter
   end
 
   def link_to_url(entity, options = {})
-    url        = Addressable::URI.parse(entity[:url])
-
+    url = if options[:external_links] && (link_id = options[:external_links][entity[:url]]&.id)
+            link_url(link_id, subdomain: 'links')
+          else
+            Addressable::URI.parse(entity[:url])
+          end
     html_attrs = { target: '_blank', rel: 'nofollow noopener noreferrer' }
 
     html_attrs[:rel] = "me #{html_attrs[:rel]}" if options[:me]

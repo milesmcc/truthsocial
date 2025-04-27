@@ -4,6 +4,7 @@ require 'rails_helper'
 
 RSpec.describe RemoteFollow do
   before do
+    allow_any_instance_of(Request).to receive(:private_address?).and_return(false)
     stub_request(:get, 'https://quitter.no/.well-known/webfinger?resource=acct:gargron@quitter.no').to_return(request_fixture('webfinger.txt'))
   end
 

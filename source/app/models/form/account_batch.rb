@@ -81,7 +81,16 @@ class Form::AccountBatch
     records = accounts.includes(:user)
 
     records.each { |account| authorize(account.user, :reject?) }
-           .each { |account| DeleteAccountService.new.call(account, reserve_email: false, reserve_username: false) }
+           .each do |account|
+             DeleteAccountService.new.call(
+               account,
+               current_account.id,
+               deletion_type: 'account_batch_reject',
+               reserve_email: false,
+               reserve_username: false,
+               skip_activitypub: true,
+             )
+           end
   end
 
   def suppress_follow_recommendation!

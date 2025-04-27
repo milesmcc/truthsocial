@@ -11,7 +11,7 @@ class AppSignUpService < BaseService
     invite_request_params = { text: params[:reason] }
     user                  = User.create!(user_params.merge(created_by_application: app, sign_up_ip: remote_ip, password_confirmation: user_params[:password], account_attributes: account_params, invite_request_attributes: invite_request_params))
 
-    Doorkeeper::AccessToken.create!(application: app,
+    OauthAccessToken.create!(application: app,
                                     resource_owner_id: user.id,
                                     scopes: app.scopes,
                                     expires_in: Doorkeeper.configuration.access_token_expires_in,

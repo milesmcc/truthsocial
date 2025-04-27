@@ -11,7 +11,7 @@ Paperclip.interpolates :filename do |attachment, style|
   end
 end
 
-Paperclip.interpolates :prefix_path do |attachment, style|
+Paperclip.interpolates :prefix_path do |attachment, _style|
   if attachment.storage_schema_version >= 1 && attachment.instance.respond_to?(:local?) && !attachment.instance.local?
     'cache' + File::SEPARATOR
   else
@@ -19,7 +19,7 @@ Paperclip.interpolates :prefix_path do |attachment, style|
   end
 end
 
-Paperclip.interpolates :prefix_url do |attachment, style|
+Paperclip.interpolates :prefix_url do |attachment, _style|
   if attachment.storage_schema_version >= 1 && attachment.instance.respond_to?(:local?) && !attachment.instance.local?
     'cache/'
   else
@@ -61,8 +61,8 @@ if ENV['S3_ENABLED'] == 'true'
 
     s3_options: {
       signature_version: ENV.fetch('S3_SIGNATURE_VERSION') { 'v4' },
-      http_open_timeout: ENV.fetch('S3_OPEN_TIMEOUT'){ '5' }.to_i,
-      http_read_timeout: ENV.fetch('S3_READ_TIMEOUT'){ '5' }.to_i,
+      http_open_timeout: ENV.fetch('S3_OPEN_TIMEOUT') { '5' }.to_i,
+      http_read_timeout: ENV.fetch('S3_READ_TIMEOUT') { '5' }.to_i,
       http_idle_timeout: 5,
       retry_limit: 0,
       http_proxy: nil,
@@ -72,7 +72,7 @@ if ENV['S3_ENABLED'] == 'true'
   if ENV.has_key?('S3_ENDPOINT')
     Paperclip::Attachment.default_options[:s3_options].merge!(
       endpoint: ENV['S3_ENDPOINT'],
-      force_path_style: ENV['S3_OVERRIDE_PATH_STYLE'] != 'true',
+      force_path_style: ENV['S3_OVERRIDE_PATH_STYLE'] != 'true'
     )
 
     Paperclip::Attachment.default_options[:url] = ':s3_path_url'
@@ -109,7 +109,7 @@ else
   Paperclip::Attachment.default_options.merge!(
     storage: :filesystem,
     path: File.join(ENV.fetch('PAPERCLIP_ROOT_PATH', File.join(':rails_root', 'public', 'system')), ':prefix_path:class', ':attachment', ':id_partition', ':style', ':filename'),
-    url: ENV.fetch('PAPERCLIP_ROOT_URL', '/system') + '/:prefix_url:class/:attachment/:id_partition/:style/:filename',
+    url: ENV.fetch('PAPERCLIP_ROOT_URL', '/system') + '/:prefix_url:class/:attachment/:id_partition/:style/:filename'
   )
 end
 
@@ -126,4 +126,11 @@ unless defined?(Seahorse)
       class NetworkingError < StandardError; end
     end
   end
+end
+
+# Set our ImageMagick security policy, but allow admins to override it
+ENV['MAGICK_CONFIGURE_PATH'] = begin
+  imagemagick_config_paths = ENV.fetch('MAGICK_CONFIGURE_PATH', '').split(File::PATH_SEPARATOR)
+  imagemagick_config_paths << Rails.root.join('config', 'imagemagick').expand_path.to_s
+  imagemagick_config_paths.join(File::PATH_SEPARATOR)
 end

@@ -1,5 +1,4 @@
 # frozen_string_literal: true
-require "./lib/proto/serializers/status_created_event.rb"
 
 class PostStatusService < BaseService
   include Redisable
@@ -14,6 +13,7 @@ class PostStatusService < BaseService
   # @option [Status] :thread Optional status to reply to
   # @option [Boolean] :sensitive
   # @option [String] :visibility
+  # @option [Group] :group Optional group to post to, `visibility` must be set to 'group' in that case
   # @option [String] :spoiler_text
   # @option [String] :language
   # @option [String] :scheduled_at
@@ -22,18 +22,26 @@ class PostStatusService < BaseService
   # @option [Doorkeeper::Application] :application
   # @option [String] :idempotency Optional idempotency key
   # @option [Boolean] :with_rate_limit
+  # @option [String] :ip_address IP address of where the request originated
   # @return [Status]
   def call(account, options = {})
-    @account     = account
-    @options     = options
-    @text        = @options[:text] || ''
-    @in_reply_to = @options[:thread]
-    @quote_id    = @options[:quote_id]
-    @mentions    = @options[:mentions] || []
+    @account                = account
+    @options                = options
+    @text                   = @options[:text] || ''
+    @in_reply_to            = @options[:thread]
+    @quote_id               = @options[:quote_id]
+    @mentions               = @options[:mentions] || []
+    @ip_address             = @options[:ip_address] || ''
+    @group                  = @options[:group]
+    @group_timeline_visible = @options[:group_timeline_visible]
+    @group_visibility       = @options[:group_visibility]
+    @domain                 = @options[:domain]
+
+    @links_service = process_links_service
 
     return idempotency_duplicate if idempotency_given? && idempotency_duplicate?
 
-    validate_media!
+    @media = validate_media!
     preprocess_attributes!
     preprocess_quote!
 
@@ -43,24 +51,21 @@ class PostStatusService < BaseService
       process_status!
       postprocess_status!
       bump_potential_friendship!
-      create_status_event
+      publish_status_event
       export_prometheus_metric
     end
 
     redis.setex(idempotency_key, 3_600, @status.id) if idempotency_given?
 
-    send_video_to_upload_worker(@media_ids.first) if video_status?
+    send_video_to_upload_worker
 
     @status
   end
 
   private
 
-  def create_status_event
-    Redis.current.publish(
-      StatusCreatedEvent::EVENT_KEY,
-      StatusCreatedEvent.new(@status).serialize
-    )
+  def publish_status_event
+    EventProvider::EventProvider.new('status.created', StatusCreatedEvent, @status, @ip_address).call unless @group_visibility == :members_only
   end
 
   def status_from_uri(uri)
@@ -90,6 +95,8 @@ class PostStatusService < BaseService
       @quote_id = quote_from_url(md[1])&.id
       @text.sub!(/RT:\s*\[.*?\]/, '')
     end
+
+    @text = @links_service.resolve_urls(@text)
   rescue ArgumentError
     raise ActiveRecord::RecordInvalid
   end
@@ -104,13 +111,13 @@ class PostStatusService < BaseService
   def process_status!
     # The following transaction block is needed to wrap the UPDATEs to
     # the media attachments when the status is created
-
     ApplicationRecord.transaction do
       @status = @account.statuses.create!(status_attributes)
+      ProcessMentionsService.new.call(@status, @mentions, @in_reply_to)
     end
 
     process_hashtags_service.call(@status)
-    process_mentions_service.call(@status, @mentions)
+    @links_service.call(@status)
   end
 
   def schedule_status!
@@ -131,45 +138,59 @@ class PostStatusService < BaseService
   end
 
   def postprocess_status!
-    LinkCrawlWorker.perform_async(@status.id) unless @status.spoiler_text? || video_status?
-    post_distribution_service.call(@status)
-    PollExpirationNotifyWorker.perform_at(@status.poll.expires_at, @status.poll.id) if @status.poll
+    LinkCrawlWorker.perform_async(@status.id, nil, @domain) unless @status.spoiler_text? || video_status?
+    PostDistributionService.new.distribute_to_author(@status)
+    # PollExpirationNotifyWorker.perform_at(@status.poll.expires_at, @status.poll.id) if @status.poll
   end
 
+  #
+  # @return [Array] Returns an empty array if there are no media_ids or if media_ids is not an Enumerable.
+  # Otherwise, it returns the media attachments associated with the account that have not been assigned a status yet.
+  #
+  # @raise [Mastodon::ValidationError] If there are more than 4 media attachments or if a poll is present.
+  # @raise [Mastodon::ValidationError] If any of the media attachments are not processed yet.
+  #
   def validate_media!
-    return if @options[:media_ids].blank? || !@options[:media_ids].is_a?(Enumerable)
+    return [] if @options[:media_ids].blank? || !@options[:media_ids].is_a?(Enumerable)
 
-    raise Mastodon::ValidationError, I18n.t('media_attachments.validations.too_many') if @options[:media_ids].size > 4 || @options[:poll].present?
+    if @options[:media_ids].size > 4 || @options[:poll].present?
+      raise Mastodon::ValidationError, I18n.t('media_attachments.validations.too_many')
+    end
 
-    @media_ids = @options[:media_ids].take(4).map(&:to_i)
-    @media = @account.media_attachments.where(status_id: nil).where(id: @media_ids).sort_by {|m| @media_ids.index(m.id)}
+    media_ids = @options[:media_ids].map(&:to_i)
+    media = @account
+            .media_attachments
+            .where(status_id: nil)
+            .where(id: media_ids)
+            .sort_by { |m| media_ids.index(m.id) }
 
-    raise Mastodon::ValidationError, I18n.t('media_attachments.validations.images_and_video') if @media.size > 1 && @media.find(&:audio_or_video?)
-    raise Mastodon::ValidationError, I18n.t('media_attachments.validations.not_ready') if @media.any?(&:not_processed?)
+    if media.any? { |m| !m.video? && m.not_processed? }
+      raise Mastodon::ValidationError, I18n.t('media_attachments.validations.not_ready')
+    end
+
+    media
   end
 
   def video_upload_enabled?
     ENV['VIDEO_REMOTE_UPLOAD_ENABLED'] == 'true'
   end
 
-  def send_video_to_upload_worker(media_attachment_id)
-    VideoUploadWorker.perform_async(media_attachment_id, @status.id)
+  def send_video_to_upload_worker
+    @media.each do |m|
+      UploadVideoStatusWorker.perform_async(m.id, @status.id) if m.video?
+    end
   end
 
   def language_from_option(str)
     ISO_639.find(str)&.alpha2
   end
 
-  def process_mentions_service
-    ProcessMentionsService.new
-  end
-
   def process_hashtags_service
     ProcessHashtagsService.new
   end
 
-  def post_distribution_service
-    PostDistributionService.new
+  def process_links_service
+    ProcessStatusLinksService.new
   end
 
   def scheduled?
@@ -201,10 +222,13 @@ class PostStatusService < BaseService
   end
 
   def bump_potential_friendship!
-    return if !@status.reply? || @account.id == @status.in_reply_to_account_id
-    ActivityTracker.increment('activity:interactions')
-    return if @account.following?(@status.in_reply_to_account_id)
-    PotentialFriendshipTracker.record(@account.id, @status.in_reply_to_account_id, :reply)
+    if @status.reply? && @account.id != @status.in_reply_to_account_id
+      ActivityTracker.increment('activity:interactions')
+      InteractionsTracker.new(@account.id, @status.in_reply_to_account_id, :reply, @account.following?(@status.in_reply_to_account_id), @status.group).track
+    elsif @status.quote? && @account.id != @status.quote.account_id
+      ActivityTracker.increment('activity:interactions')
+      InteractionsTracker.new(@account.id, @status.quote.account_id, :quote, @account.following?(@status.quote.account_id), @status.quote.group).track
+    end
   end
 
   def status_attributes
@@ -212,7 +236,10 @@ class PostStatusService < BaseService
       text: @text,
       media_attachments: @media || [],
       thread: @in_reply_to,
-      poll_attributes: poll_attributes,
+      group: @group,
+      group_timeline_visible: @group_timeline_visible || false,
+      polls: poll_attributes,
+      has_poll: @options[:poll].present?,
       sensitive: @sensitive,
       spoiler_text: @options[:spoiler_text] || '',
       visibility: @visibility,
@@ -233,13 +260,14 @@ class PostStatusService < BaseService
 
   def poll_attributes
     return if @options[:poll].blank?
-
-    @options[:poll].merge(account: @account, voters_count: 0)
+    @options[:poll][:options_attributes] = @options[:poll].delete(:options).map.with_index { |v, i| { option_number: i, text: v } }
+    [Poll.new(@options[:poll])]
   end
 
   def scheduled_options
     @options.tap do |options_hash|
       options_hash[:in_reply_to_id]  = options_hash.delete(:thread)&.id
+      options_hash[:group_id]        = options_hash.delete(:group)&.id
       options_hash[:application_id]  = options_hash.delete(:application)&.id
       options_hash[:scheduled_at]    = nil
       options_hash[:idempotency]     = nil
@@ -249,10 +277,10 @@ class PostStatusService < BaseService
 
   def export_prometheus_metric
     metric_type = @in_reply_to ? :replies : :statuses
-    Prometheus::ApplicationExporter::increment(metric_type)
+    Prometheus::ApplicationExporter.increment(metric_type)
   end
 
   def video_status?
-    @media.present? && @media.first.video? && video_upload_enabled?
+    video_upload_enabled? && @media.any?(&:video?)
   end
 end

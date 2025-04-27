@@ -7,7 +7,8 @@ describe Settings::TwoFactorAuthentication::WebauthnCredentialsController do
   render_views
 
   let(:user) { Fabricate(:user) }
-  let(:domain) { "#{Rails.configuration.x.use_https ? 'https' : 'http' }://#{Rails.configuration.x.web_domain}" }
+  let(:base_domain) { Rails.configuration.x.web_domain }
+  let(:domain) { "#{Rails.configuration.x.use_https ? 'https' : 'http' }://#{base_domain}" }
   let(:fake_client) { WebAuthn::FakeClient.new(domain) }
 
   def add_webauthn_credential(user)
@@ -203,6 +204,7 @@ describe Settings::TwoFactorAuthentication::WebauthnCredentialsController do
     context 'when signed in' do
       before do
         sign_in user, scope: :user
+        WebAuthn.configuration.rp_id = base_domain
       end
 
       context 'when user has enabled otp' do

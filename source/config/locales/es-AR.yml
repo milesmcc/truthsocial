@@ -942,6 +942,9 @@ es-AR:
     validation_errors:
       one: "¡Falta algo! Por favor, revisá el error abajo"
       other: "¡Falta algo! Por favor, revisá los %{count} errores abajo"
+  groups:
+    errors:
+      too_many_admins: Puede asignar hasta %{count} administradores para el grupo en este momento.
   html_validator:
     invalid_markup: 'contiene markup HTML no válido: %{error}'
   identity_proofs:
@@ -1457,6 +1460,8 @@ es-AR:
     invalid_otp_token: Código de dos factores no válido
     invalid_sign_in_token: Código de seguridad no válido
     otp_lost_help_html: Si perdiste al acceso a ambos, podés ponerte en contacto con %{email}
+    previously_used_password: Por favor use una contraseña que no haya usado previamente.
+    password_mismatch: La contraseña y la confirmación de contraseña no son iguales.
     seamless_external_login: Iniciaste sesión desde un servicio externo, así que la configuración de contraseña y correo electrónico no están disponibles.
     signed_in_as: 'Iniciaste sesión como:'
     suspicious_sign_in_confirmation: Parece que no iniciaste sesión desde este dispositivo antes, y no iniciaste sesión durante un tiempo, así que te estamos enviando un código de seguridad a tu dirección de correo electrónico para confirmar que sos vos.

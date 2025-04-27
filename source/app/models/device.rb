@@ -15,7 +15,7 @@
 #
 
 class Device < ApplicationRecord
-  belongs_to :access_token, class_name: 'Doorkeeper::AccessToken'
+  belongs_to :access_token, class_name: 'OauthAccessToken'
   belongs_to :account
 
   has_many :one_time_keys, dependent: :destroy, inverse_of: :device

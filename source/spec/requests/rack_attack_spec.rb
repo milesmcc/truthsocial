@@ -291,6 +291,40 @@ RSpec.describe 'Rack::Attack', type: :request do
         expect(response).to have_http_status(429)
       end
     end
+
+    context 'tracking' do
+      let(:limit) { 5 }
+      let(:period) { 1800 }
+
+      it 'stores rate limited user in a redis list' do
+        expect(Redis.current.zrange("rate_limit:#{DateTime.current.to_date}", 0, -1, with_scores: true)).to eq []
+
+        simulate_requests_for_throttle "throttle_email_confirmations/email:#{user.email}", period, limit
+
+        post '/auth/confirmation', headers: headers, params: params_auth
+        expect(Redis.current.zrange("rate_limit:#{DateTime.current.to_date}", 0, -1, with_scores: true)).to eq [["#{user.id}-172.172.172.172", 1.0]]
+
+        post '/auth/confirmation', headers: headers, params: params_auth
+        expect(Redis.current.zrange("rate_limit:#{DateTime.current.to_date}", 0, -1, with_scores: true)).to eq [["#{user.id}-172.172.172.172", 2.0]]
+      end
+    end
+  end
+
+  describe 'throttle Apple app attestation api requests' do
+    context 'when too many api requests are requested' do
+      let(:limit) { 11 }
+      let(:period) { 1 }
+      let(:headers) { { 'REMOTE_ADDR': ip, 'Authorization': 'Bearer ' + token.token } }
+
+      before do
+        simulate_requests_for_throttle "throttle_app_attest_attestations:#{ip}", period, limit
+      end
+
+      it 'it returns http too many requests for /api/v1/truth/ios_device_check/rate_limit' do
+        get '/api/v1/truth/ios_device_check/rate_limit', headers: headers
+        expect(response).to have_http_status(429)
+      end
+    end
   end
 
   def simulate_requests_for_throttle(key, period, times)

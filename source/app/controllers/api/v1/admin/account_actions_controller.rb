@@ -11,7 +11,7 @@ class Api::V1::Admin::AccountActionsController < Api::BaseController
     account_action.current_account = current_account
     account_action.save!
 
-    render_empty
+    render json: @account, serializer: REST::Admin::AccountSerializer
   end
 
   private
@@ -27,7 +27,8 @@ class Api::V1::Admin::AccountActionsController < Api::BaseController
       :warning_preset_id,
       :text,
       :send_email_notification,
-      :duration
+      :duration,
+      :feature_name
     )
   end
 end

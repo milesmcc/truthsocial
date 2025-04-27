@@ -1,16 +1,27 @@
-enabled         = ENV['ES_ENABLED'] == 'true'
-host            = ENV.fetch('ES_HOST') { 'localhost' }
-port            = ENV.fetch('ES_PORT') { 9200 }
+enabled = ENV['ES_ENABLED'] == 'true'
+indexing_enabled = ENV.fetch('ES_INDEXING_ENABLED') { ENV['ES_ENABLED'] } == 'true'
+host = ENV.fetch('ES_HOST') { 'localhost' }
+port = ENV.fetch('ES_PORT') { 9200 }
 fallback_prefix = ENV.fetch('REDIS_NAMESPACE') { nil }
-prefix          = ENV.fetch('ES_PREFIX') { fallback_prefix }
+prefix = ENV.fetch('ES_PREFIX') { fallback_prefix }
+username = ENV.fetch('ES_USER') { nil }
+password = ENV.fetch('ES_PASSWORD') { nil }
 
 Chewy.settings = {
-  host: "#{host}:#{port}",
+  host: host,
+  port: port,
   prefix: prefix,
   enabled: enabled,
+  indexing_enabled: indexing_enabled,
   journal: false,
   sidekiq: { queue: 'chewy' },
 }
+
+if username && password
+  Chewy.settings[:user] = username
+  Chewy.settings[:password] = password
+end
+
 
 # We use our own async strategy even outside the request-response
 # cycle, which takes care of checking if ElasticSearch is enabled
@@ -25,6 +36,10 @@ module Chewy
     def enabled?
       settings[:enabled]
     end
+
+    def indexing_enabled?
+      settings[:indexing_enabled]
+    end
   end
 end
 
@@ -33,23 +48,3 @@ end
 # Mastodon is run with hidden services enabled, because
 # ElasticSearch is *not* supposed to be accessed through a proxy
 Faraday.ignore_env_proxy = true
-
-# Elasticsearch 7.x workaround
-Elasticsearch::Transport::Client.prepend Module.new {
-  def search(arguments = {})
-    arguments[:rest_total_hits_as_int] = true
-    super arguments
-  end
-}
-
-Elasticsearch::API::Indices::IndicesClient.prepend Module.new {
-  def create(arguments = {})
-    arguments[:include_type_name] = true
-    super arguments
-  end
-
-  def put_mapping(arguments = {})
-    arguments[:include_type_name] = true
-    super arguments
-  end
-}

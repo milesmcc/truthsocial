@@ -7,6 +7,10 @@ class Rack::Attack
     def authenticated_token
       return @token if defined?(@token)
 
+      if Rails.env.production? && path.start_with?('/api/v1/accounts/verify_credentials')
+        ActiveRecord::Base.connection.stick_to_master!(false)
+      end
+
       @token = Doorkeeper::OAuth::Token.authenticate(
         Doorkeeper::Grape::AuthorizationDecorator.new(self),
         *Doorkeeper.configuration.access_token_methods
@@ -14,7 +18,7 @@ class Rack::Attack
     end
 
     def remote_ip
-      @remote_ip ||= (@env["action_dispatch.remote_ip"] || ip).to_s
+      @remote_ip ||= (@env['action_dispatch.remote_ip'] || ip).to_s
     end
 
     def authenticated_user_id
@@ -40,10 +44,9 @@ class Rack::Attack
     def private_address?(address)
       PrivateAddressCheck.private_address?(IPAddr.new(address))
     end
-
   end
 
-  unless ENV["SKIP_IP_RATE_LIMITING"] == "true"
+  unless ENV['SKIP_IP_RATE_LIMITING'] == 'true'
     Rack::Attack.safelist('allow from private') do |req|
       req.private_address?(req.remote_ip)
     end
@@ -97,20 +100,19 @@ class Rack::Attack
 
     throttle('throttle_password_resets/email', limit: 5, period: 30.minutes) do |req|
       (req.params.dig('user', 'email').presence if req.post? && req.path == '/auth/password') ||
-      (req.params.dig('email').presence if req.post? && req.path == '/api/pleroma/change_password') ||
-      (req.params.dig('email').presence if req.post? && req.path == '/api/v1/truth/password_reset/request')
-
+        (req.params.dig('email').presence if req.post? && req.path == '/api/pleroma/change_password') ||
+        (req.params.dig('email').presence if req.post? && req.path == '/api/v1/truth/password_reset/request')
     end
 
     throttle('throttle_email_confirmations/ip', limit: 25, period: 5.minutes) do |req|
-      req.remote_ip if ((req.post? && %w(/auth/confirmation /api/v1/emails/confirmations).include?(req.path)) ||
-                       (req.get? && req.path.include?('api/v1/truth/email/confirm')))
+      req.remote_ip if (req.post? && %w(/auth/confirmation /api/v1/emails/confirmations).include?(req.path)) ||
+                       (req.get? && req.path.include?('api/v1/truth/email/confirm'))
     end
 
     throttle('throttle_email_confirmations/email', limit: 5, period: 30.minutes) do |req|
       if req.post? && req.path == '/auth/confirmation'
         req.params.dig('user', 'email').presence
-      elsif ((req.post? && req.path == '/api/v1/emails/confirmations') || (req.get? && req.path == '/api/v1/truth/email/confirm'))
+      elsif (req.post? && req.path == '/api/v1/emails/confirmations') || (req.get? && req.path == '/api/v1/truth/email/confirm')
         req.authenticated_user_id
       end
     end
@@ -121,8 +123,23 @@ class Rack::Attack
 
     throttle('throttle_login_attempts/email', limit: 25, period: 1.hour) do |req|
       (req.session[:attempt_user_id] || req.params.dig('user', 'email').presence if req.post? && req.path == '/auth/sign_in') ||
-      (req.params.dig('username').presence if req.post? && req.path == '/oauth/token') ||
-      (req.params.dig('mfa_token').presence if req.post? && req.path == '/oauth/mfa/challenge')
+        (req.params.dig('username').presence if req.post? && req.path == '/oauth/token') ||
+        (req.params.dig('mfa_token').presence if req.post? && req.path == '/oauth/mfa/challenge')
+    end
+
+    API_CHAT_MESSAGE_REGEX = /\A\/api\/v1\/pleroma\/chats\/[\d]+\/messages/.freeze
+    API_CHAT_MESSAGE_REACTION_REGEX = /\A\/api\/v1\/pleroma\/chats\/[\d]+\/messages\/[\d]+\/reactions/.freeze
+
+    throttle('throttle_chat_messages', limit: ChatMessage::MAX_MESSAGES_PER_MIN, period: 1.minute) do |req|
+      req.remote_ip if req.post? && req.path.match?(API_CHAT_MESSAGE_REGEX)
+    end
+
+    throttle('throttle_chat_message_reactions', limit: ChatMessageReaction::MAX_MESSAGES_PER_MIN, period: 1.minute) do |req|
+      req.remote_ip if req.post? && req.path.match?(API_CHAT_MESSAGE_REACTION_REGEX)
+    end
+
+    throttle('throttle_app_attest_attestations', limit: 11, period: 1.second) do |req|
+      req.remote_ip if req.path == '/api/v1/truth/ios_device_check/rate_limit'
     end
 
     self.throttled_response = lambda do |env|

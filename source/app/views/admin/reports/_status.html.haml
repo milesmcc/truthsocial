@@ -1,3 +1,5 @@
+- show_author ||= false
+
 .batch-table__row
   %label.batch-table__row__select.batch-checkbox
     = f.check_box :status_ids, { multiple: true, include_hidden: false }, status.id
@@ -33,7 +35,14 @@
         = t('statuses.boosted_from_html', acct_link: admin_account_inline_link_to(status.proper.account))
       - else
         = fa_visibility_icon(status)
-        = t("statuses.visibilities.#{status.visibility}")
+        - if status.group_visibility?
+          - if status.group.present?
+            = link_to admin_group_path(status.group.id), class: 'detailed-status__group' do
+              = t("statuses.visibilities.#{status.visibility}")
+          - else
+            = t("statuses.visibilities.#{status.visibility}")
+        - else
+          = t("statuses.visibilities.#{status.visibility}")
       - if status.proper.sensitive?
         ·
         = fa_icon('eye-slash fw')

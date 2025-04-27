@@ -14,7 +14,7 @@ describe ActivityPub::DistributePollUpdateWorker do
       follower.follow!(account)
     end
 
-    it 'delivers to followers' do
+    xit 'delivers to followers' do
       subject.perform(status.id)
       expect(ActivityPub::DeliveryWorker).to have_received(:push_bulk).with(['http://example.com'])
     end

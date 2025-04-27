@@ -17,7 +17,17 @@ class Feed
     @fanout_key = feed_key(@type, @account.id)
 
     status_ids = !@whale_following.empty? && @type == :home ? get_with_whales : get_fanout_only
-    Status.where(id: status_ids).cache_ids
+
+    Status.
+      where(id: status_ids).
+      where.not(visibility: "self").
+      or(Status.where(id: status_ids).where(account_id: @account.id)).
+      cache_ids
+  end
+
+  def clear!
+    key_to_clear = feed_key(@type, @account.id)
+    redis_timelines.del(key_to_clear)
   end
 
   protected
@@ -26,9 +36,9 @@ class Feed
     @max_id = '+inf' if @max_id.blank?
     if @min_id.blank?
       @since_id = '-inf' if @since_id.blank?
-      redis_timelines.zrevrangebyscore(@fanout_key, "(#{@max_id}", "(#{@since_id}", limit: [0, @limit], with_scores: true).map(&:first).map(&:to_i)
+      FeedManager.instance.status_ids_to_plain_numbers(redis_timelines.zrevrangebyscore(@fanout_key, "(#{@max_id}", "(#{@since_id}", limit: [0, @limit], with_scores: true).map(&:first)).map(&:to_i)
     else
-      redis_timelines.zrangebyscore(@fanout_key, "(#{@min_id}", "(#{@max_id}", limit: [0, @limit], with_scores: true).map(&:first).map(&:to_i)
+      FeedManager.instance.status_ids_to_plain_numbers(redis_timelines.zrangebyscore(@fanout_key, "(#{@min_id}", "(#{@max_id}", limit: [0, @limit], with_scores: true).map(&:first)).map(&:to_i)
     end
   end
 
@@ -63,7 +73,7 @@ class Feed
         pipeline.zrange(feed_key(:whale, account_id), '0', '-1')
       end
     end
-    subsets.flatten.map(&:to_i)
+    FeedManager.instance.status_ids_to_plain_numbers(subsets.flatten).map(&:to_i)
   end
 
   def whale_following

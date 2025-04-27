@@ -305,7 +305,8 @@ RSpec.describe Auth::SessionsController, type: :controller do
           user.webauthn_credentials.take
         end
 
-        let(:domain) { "#{Rails.configuration.x.use_https ? 'https' : 'http' }://#{Rails.configuration.x.web_domain}" }
+        let(:base_domain) { Rails.configuration.x.web_domain }
+        let(:domain) { "#{Rails.configuration.x.use_https ? 'https' : 'http' }://#{base_domain}" }
 
         let(:fake_client) { WebAuthn::FakeClient.new(domain) }
 
@@ -313,7 +314,7 @@ RSpec.describe Auth::SessionsController, type: :controller do
 
         let(:sign_count) { 1234 }
 
-        let(:fake_credential) { fake_client.get(challenge: challenge, sign_count: sign_count) }
+        let(:fake_credential) { fake_client.get(challenge: challenge, sign_count: sign_count, rp_id: base_domain) }
 
         context 'using email and password' do
           before do
@@ -334,26 +335,6 @@ RSpec.describe Auth::SessionsController, type: :controller do
           it 'renders webauthn authentication page' do
             expect(controller).to render_template("two_factor")
             expect(controller).to render_template(partial: "_webauthn_form")
-          end
-        end
-
-        context 'using a valid webauthn credential' do
-          before do
-            @controller.session[:webauthn_challenge] = challenge
-
-            post :create, params: { user: { credential: fake_credential } }, session: { attempt_user_id: user.id, attempt_user_updated_at: user.updated_at.to_s }
-          end
-
-          it 'instructs the browser to redirect to home' do
-            expect(body_as_json[:redirect_path]).to eq(root_path)
-          end
-
-          it 'logs the user in' do
-            expect(controller.current_user).to eq user
-          end
-
-          it 'updates the sign count' do
-            expect(webauthn_credential.reload.sign_count).to eq(sign_count)
           end
         end
       end

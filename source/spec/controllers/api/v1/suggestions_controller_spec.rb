@@ -15,8 +15,8 @@ RSpec.describe Api::V1::SuggestionsController, type: :controller do
     let(:jeff) { Fabricate(:account) }
 
     before do
-      PotentialFriendshipTracker.record(user.account_id, bob.id, :reblog)
-      PotentialFriendshipTracker.record(user.account_id, jeff.id, :favourite)
+      InteractionsTracker.new(user.account_id, bob.id, :reblog).track
+      InteractionsTracker.new(user.account_id, jeff.id, :favourite).track
 
       get :index
     end

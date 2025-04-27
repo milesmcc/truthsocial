@@ -14,12 +14,12 @@ RSpec.describe Api::Pleroma::AccountsController, type: :controller do
 
   describe 'GET #setup_totp' do
     let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'alice')) }
-    let(:scopes) { 'write:security' }
+    let(:scopes) { 'write:security read' }
 
     before do
       get :setup_totp
     end
-  
+
     it 'returns http success' do
       expect(response).to have_http_status(200)
     end
@@ -33,7 +33,7 @@ RSpec.describe Api::Pleroma::AccountsController, type: :controller do
   describe 'POST #confirm_totp' do
     let(:code) { '123456' }
     let(:new_otp_secret) { User.generate_otp_secret(32) }
-    let(:scopes) { 'write:security' }
+    let(:scopes) { 'write:security write' }
     let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'alice'), otp_secret: new_otp_secret) }
 
     context 'with correct password and an incorrect code' do
@@ -60,7 +60,7 @@ RSpec.describe Api::Pleroma::AccountsController, type: :controller do
   describe 'GET #backup_codes' do
     let(:code) { '123456' }
     let(:new_otp_secret) { User.generate_otp_secret(32) }
-    let(:scopes) { 'write:security' }
+    let(:scopes) { 'write:security read' }
     let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'alice'), otp_secret: new_otp_secret) }
 
     it 'returns http success' do
@@ -79,7 +79,7 @@ RSpec.describe Api::Pleroma::AccountsController, type: :controller do
   describe 'DELETE #delete_totp' do
     let(:code) { '123456' }
     let(:new_otp_secret) { User.generate_otp_secret(32) }
-    let(:scopes) { 'write:security' }
+    let(:scopes) { 'write:security write' }
     let(:user) { Fabricate(:user, account: Fabricate(:account, username: 'alice'), otp_secret: new_otp_secret, otp_required_for_login: true) }
 
     it 'returns http success' do

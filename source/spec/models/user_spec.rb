@@ -4,172 +4,172 @@ require 'devise_two_factor/spec_helpers'
 RSpec.describe User, type: :model do
   it_behaves_like 'two_factor_backupable'
 
-    describe 'otp_secret' do
-      it 'is encrypted with OTP_SECRET environment variable' do
-        user = Fabricate(:user,
-                        encrypted_otp_secret: "Fttsy7QAa0edaDfdfSz094rRLAxc8cJweDQ4BsWH/zozcdVA8o9GLqcKhn2b\nGi/V\n",
-                        encrypted_otp_secret_iv: 'rys3THICkr60BoWC',
-                        encrypted_otp_secret_salt: '_LMkAGvdg7a+sDIKjI3mR2Q==')
+  describe 'otp_secret' do
+    it 'is encrypted with OTP_SECRET environment variable' do
+      user = Fabricate(:user,
+                       encrypted_otp_secret: "Fttsy7QAa0edaDfdfSz094rRLAxc8cJweDQ4BsWH/zozcdVA8o9GLqcKhn2b\nGi/V\n",
+                       encrypted_otp_secret_iv: 'rys3THICkr60BoWC',
+                       encrypted_otp_secret_salt: '_LMkAGvdg7a+sDIKjI3mR2Q==')
 
-        expect(user.otp_secret).to eq 'anotpsecretthatshouldbeencrypted'
+      expect(user.otp_secret).to eq 'anotpsecretthatshouldbeencrypted'
+    end
+  end
+
+  describe 'validations' do
+    it 'is invalid without an account' do
+      user = Fabricate.build(:user, account: nil)
+      user.valid?
+      expect(user).to model_have_error_on_field(:account)
+    end
+
+    it 'is invalid without a valid locale' do
+      user = Fabricate.build(:user, locale: 'toto')
+      user.valid?
+      expect(user).to model_have_error_on_field(:locale)
+    end
+
+    it 'is invalid without a valid email' do
+      user = Fabricate.build(:user, email: 'john@')
+      user.valid?
+      expect(user).to model_have_error_on_field(:email)
+    end
+
+    it 'is valid with an invalid e-mail that has already been saved' do
+      user = Fabricate.build(:user, email: 'invalid-email')
+      user.save(validate: false)
+      expect(user.valid?).to be true
+    end
+
+    it 'cleans out empty string from languages' do
+      user = Fabricate.build(:user, chosen_languages: [''])
+      user.valid?
+      expect(user.chosen_languages).to eq nil
+    end
+  end
+
+  describe 'scopes' do
+    describe 'recent' do
+      it 'returns an array of recent users ordered by id' do
+        user_1 = Fabricate(:user)
+        user_2 = Fabricate(:user)
+        expect(User.recent).to eq [user_2, user_1]
       end
     end
 
-    describe 'validations' do
-      it 'is invalid without an account' do
-        user = Fabricate.build(:user, account: nil)
-        user.valid?
-        expect(user).to model_have_error_on_field(:account)
-      end
-
-      it 'is invalid without a valid locale' do
-        user = Fabricate.build(:user, locale: 'toto')
-        user.valid?
-        expect(user).to model_have_error_on_field(:locale)
-      end
-
-      it 'is invalid without a valid email' do
-        user = Fabricate.build(:user, email: 'john@')
-        user.valid?
-        expect(user).to model_have_error_on_field(:email)
-      end
-
-      it 'is valid with an invalid e-mail that has already been saved' do
-        user = Fabricate.build(:user, email: 'invalid-email')
-        user.save(validate: false)
-        expect(user.valid?).to be true
-      end
-
-      it 'cleans out empty string from languages' do
-        user = Fabricate.build(:user, chosen_languages: [''])
-        user.valid?
-        expect(user.chosen_languages).to eq nil
+    describe 'admins' do
+      it 'returns an array of users who are admin' do
+        user_1 = Fabricate(:user, admin: false)
+        user_2 = Fabricate(:user, admin: true)
+        expect(User.admins).to match_array([user_2])
       end
     end
 
-    describe 'scopes' do
-      describe 'recent' do
-        it 'returns an array of recent users ordered by id' do
-          user_1 = Fabricate(:user)
-          user_2 = Fabricate(:user)
-          expect(User.recent).to eq [user_2, user_1]
-        end
-      end
-
-      describe 'admins' do
-        it 'returns an array of users who are admin' do
-          user_1 = Fabricate(:user, admin: false)
-          user_2 = Fabricate(:user, admin: true)
-          expect(User.admins).to match_array([user_2])
-        end
-      end
-
-      describe 'confirmed' do
-        it 'returns an array of users who are confirmed' do
-          user_1 = Fabricate(:user, confirmed_at: nil)
-          user_2 = Fabricate(:user, confirmed_at: Time.zone.now)
-          expect(User.confirmed).to match_array([user_2])
-        end
-      end
-
-      describe 'inactive' do
-        it 'returns a relation of inactive users' do
-          specified = Fabricate(:user, current_sign_in_at: 15.days.ago)
-          Fabricate(:user, current_sign_in_at: 6.days.ago)
-
-          expect(User.inactive).to match_array([specified])
-        end
-      end
-
-      describe 'matches_email' do
-        it 'returns a relation of users whose email starts with the given string' do
-          specified = Fabricate(:user, email: 'specified@spec')
-          Fabricate(:user, email: 'unspecified@spec')
-
-          expect(User.matches_email('specified')).to match_array([specified])
-        end
-      end
-
-      describe 'matches_sms' do
-        it 'returns a relation of users whose sms starts with the given string' do
-          specified = Fabricate(:user, sms: '234-555-2344')
-          Fabricate(:user, sms: '205-555-2344')
-
-          expect(User.matches_sms('234-555-2344')).to match_array([specified])
-        end
+    describe 'confirmed' do
+      it 'returns an array of users who are confirmed' do
+        user_1 = Fabricate(:user, confirmed_at: nil)
+        user_2 = Fabricate(:user, confirmed_at: Time.zone.now)
+        expect(User.confirmed).to match_array([user_2])
       end
     end
 
-    let(:account) { Fabricate(:account, username: 'alice') }
-    let(:password) { 'abcd1234' }
+    describe 'inactive' do
+      it 'returns a relation of inactive users' do
+        specified = Fabricate(:user, current_sign_in_at: 15.days.ago)
+        Fabricate(:user, current_sign_in_at: 6.days.ago)
 
-    describe 'blacklist' do
-      around(:each) do |example|
-        old_blacklist = Rails.configuration.x.email_blacklist
-
-        Rails.configuration.x.email_domains_blacklist = 'mvrht.com'
-
-        example.run
-
-        Rails.configuration.x.email_domains_blacklist = old_blacklist
-      end
-
-      it 'should allow a non-blacklisted user to be created' do
-        user = User.new(email: 'foo@example.com', account: account, password: password, agreement: true)
-
-        expect(user.valid?).to be_truthy
-      end
-
-      it 'should not allow a blacklisted user to be created' do
-        user = User.new(email: 'foo@mvrht.com', account: account, password: password, agreement: true)
-
-        expect(user.valid?).to be_falsey
-      end
-
-      it 'should not allow a subdomain blacklisted user to be created' do
-        user = User.new(email: 'foo@mvrht.com.topdomain.tld', account: account, password: password, agreement: true)
-
-        expect(user.valid?).to be_falsey
+        expect(User.inactive).to match_array([specified])
       end
     end
 
-    describe '#set_waitlist_position' do
-      let(:user_1) { Fabricate(:user, approved: false, waitlist_position: 1) }
-      let(:user_2) { Fabricate(:user, approved: false, waitlist_position: 2) }
-      let(:user_3) { Fabricate(:user, approved: false, waitlist_position: 3) }
-      let(:user_4) { Fabricate(:user, approved: false, waitlist_position: 4) }
-      let(:user_5) { Fabricate(:user, approved: false) }
+    describe 'matches_email' do
+      it 'returns a relation of users whose email starts with the given string' do
+        specified = Fabricate(:user, email: 'specified@spec')
+        Fabricate(:user, email: 'unspecified@spec')
 
-      before do
-        user_1
-        user_2
-        user_3
-        user_4
-        user_5
-      end
-
-      it 'increments the position of the last pending user' do
-        expect(user_5.set_waitlist_position).to be 11343
+        expect(User.matches_email('specified')).to match_array([specified])
       end
     end
 
-    describe '#set_waitlist_position for first waitlist user' do
-      let(:user_1) { Fabricate(:user, approved: true) }
-      let(:user_2) { Fabricate(:user, approved: true) }
-      let(:user_3) { Fabricate(:user, approved: true) }
-      let(:user_4) { Fabricate(:user, approved: true) }
-      let(:user_5) { Fabricate(:user, approved: false)}
+    describe 'matches_sms' do
+      it 'returns a relation of users whose sms starts with the given string' do
+        specified = Fabricate(:user, sms: '234-555-2344')
+        Fabricate(:user, sms: '205-555-2344')
 
-      before do
-        user_1
-        user_2
-        user_3
-        user_4
-        user_5
+        expect(User.matches_sms('234-555-2344')).to match_array([specified])
       end
+    end
+  end
 
-      it 'increments the position of the last pending user' do
-        expect(user_5.set_waitlist_position).to be 11343
+  let(:account) { Fabricate(:account, username: 'alice') }
+  let(:password) { 'abcd1234' }
+
+  describe 'blacklist' do
+    around(:each) do |example|
+      old_blacklist = Rails.configuration.x.email_blacklist
+
+      Rails.configuration.x.email_domains_blacklist = 'mvrht.com'
+
+      example.run
+
+      Rails.configuration.x.email_domains_blacklist = old_blacklist
+    end
+
+    it 'should allow a non-blacklisted user to be created' do
+      user = User.new(email: 'foo@example.com', account: account, password: password, agreement: true)
+
+      expect(user.valid?).to be_truthy
+    end
+
+    it 'should not allow a blacklisted user to be created' do
+      user = User.new(email: 'foo@mvrht.com', account: account, password: password, agreement: true)
+
+      expect(user.valid?).to be_falsey
+    end
+
+    it 'should not allow a subdomain blacklisted user to be created' do
+      user = User.new(email: 'foo@mvrht.com.topdomain.tld', account: account, password: password, agreement: true)
+
+      expect(user.valid?).to be_falsey
+    end
+  end
+
+  describe '#set_waitlist_position' do
+    let(:user_1) { Fabricate(:user, approved: false, waitlist_position: 1) }
+    let(:user_2) { Fabricate(:user, approved: false, waitlist_position: 2) }
+    let(:user_3) { Fabricate(:user, approved: false, waitlist_position: 3) }
+    let(:user_4) { Fabricate(:user, approved: false, waitlist_position: 4) }
+    let(:user_5) { Fabricate(:user, approved: false) }
+
+    before do
+      user_1
+      user_2
+      user_3
+      user_4
+      user_5
+    end
+
+    it 'increments the position of the last pending user' do
+      expect(user_5.set_waitlist_position).to be 11_343
+    end
+  end
+
+  describe '#set_waitlist_position for first waitlist user' do
+    let(:user_1) { Fabricate(:user, approved: true) }
+    let(:user_2) { Fabricate(:user, approved: true) }
+    let(:user_3) { Fabricate(:user, approved: true) }
+    let(:user_4) { Fabricate(:user, approved: true) }
+    let(:user_5) { Fabricate(:user, approved: false) }
+
+    before do
+      user_1
+      user_2
+      user_3
+      user_4
+      user_5
+    end
+
+    it 'increments the position of the last pending user' do
+      expect(user_5.set_waitlist_position).to be 11_343
     end
   end
 
@@ -201,7 +201,7 @@ RSpec.describe User, type: :model do
       let(:user_1) { Fabricate(:user, approved: false, waitlist_position: 1) }
 
       it 'returns correct waitlist number' do
-        expect(user_1.get_position_in_waitlist_queue).to be 50001
+        expect(user_1.get_position_in_waitlist_queue).to be 50_001
       end
     end
 
@@ -231,6 +231,40 @@ RSpec.describe User, type: :model do
       user = Fabricate.build(:user, confirmed_at: Time.now.utc, unconfirmed_email: 'new-email@example.com')
       user.confirm
       expect(user.email).to eq 'new-email@example.com'
+    end
+  end
+
+  describe '#integrity_score' do
+    context 'when android default integrity score is not set' do
+      it 'returns 1 if last status was created before midnight or null' do
+        user = Fabricate(:user)
+        expect(user.integrity_score).to eq 1
+      end
+
+      it 'returns 0 if last status was not created before midnight' do
+        user = Fabricate(:user)
+        Fabricate(:status, text: 'test', account: user.account, created_at: 1.minute.ago)
+        Procedure.process_account_status_statistics_queue
+        expect(user.integrity_score).to eq 0
+      end
+
+      it 'should disable app integrity' do
+        stub_const('ENV', ENV.to_hash.merge('PLAY_INTEGRITY_ENABLED' => false))
+        user = Fabricate(:user)
+        expect(user.integrity_score).to eq 0
+      end
+    end
+  end
+
+  describe '#sms_country' do
+    it 'should return nil if sms is not configured' do
+      user = Fabricate(:user)
+      expect(user.sms_country).to be_nil
+    end
+
+    it 'should return country code if sms is configured' do
+      user = Fabricate(:user, sms: '+38912345678')
+      expect(user.sms_country).to eq "MK"
     end
   end
 
@@ -278,7 +312,7 @@ RSpec.describe User, type: :model do
   end
 
   describe 'self.get_user_from_token' do
-    let(:user) { Fabricate(:user, created_at: Time.now - 10000, updated_at: Time.now) }
+    let(:user) { Fabricate(:user, created_at: Time.now - 10_000, updated_at: Time.now) }
     let(:token) { user.user_token }
 
     it 'finds a user based on the token passed in' do
@@ -288,7 +322,7 @@ RSpec.describe User, type: :model do
     end
 
     it 'returns nil if it finds no user' do
-      bad_token  = EncryptAttrService.encrypt("1234n+=#{user.created_at.to_s}")
+      bad_token  = EncryptAttrService.encrypt("1234n+=#{user.created_at}")
       found_user = User.get_user_from_token(bad_token)
 
       expect(found_user).to be_nil
@@ -296,7 +330,7 @@ RSpec.describe User, type: :model do
   end
 
   describe 'validate_user_token' do
-    let(:user) { Fabricate(:user, created_at: Time.now - 10000, updated_at: Time.now) }
+    let(:user) { Fabricate(:user, created_at: Time.now - 10_000, updated_at: Time.now) }
     let(:token) { user.user_token }
 
     it 'returns true if the token does match' do
@@ -305,7 +339,7 @@ RSpec.describe User, type: :model do
     end
 
     it 'returns false if the token does not match' do
-      bad_token  = EncryptAttrService.encrypt("#{user.id}+=#{user.created_at.to_s}")
+      bad_token = EncryptAttrService.encrypt("#{user.id}+=#{user.created_at}")
       expect(user.validate_user_token(bad_token)).to be(false)
     end
   end
@@ -318,18 +352,18 @@ RSpec.describe User, type: :model do
   end
 
   describe '#setting_default_privacy' do
-    it 'returns default privacy setting if user has configured'  do
+    it 'returns default privacy setting if user has configured' do
       user = Fabricate(:user)
       user.settings[:default_privacy] = 'unlisted'
       expect(user.setting_default_privacy).to eq 'unlisted'
     end
 
-    it "returns 'private' if user has not configured default privacy setting and account is locked"  do
+    it "returns 'private' if user has not configured default privacy setting and account is locked" do
       user = Fabricate(:user, account: Fabricate(:account, locked: true))
       expect(user.setting_default_privacy).to eq 'private'
     end
 
-    it "returns 'public' if user has not configured default privacy setting and account is not locked"  do
+    it "returns 'public' if user has not configured default privacy setting and account is not locked" do
       user = Fabricate(:user, account: Fabricate(:account, locked: false))
       expect(user.setting_default_privacy).to eq 'public'
     end
@@ -392,7 +426,7 @@ RSpec.describe User, type: :model do
     let(:app) { Fabricate(:application, owner: user) }
 
     it 'returns a token' do
-      expect(user.token_for_app(app)).to be_a(Doorkeeper::AccessToken)
+      expect(user.token_for_app(app)).to be_a(OauthAccessToken)
     end
 
     it 'persists a token' do
@@ -651,7 +685,7 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "#send_approved_notification" do
+  describe '#send_approved_notification' do
     subject(:user) { Fabricate(:user, approved: false) }
 
     class DummyNotifyService
@@ -674,6 +708,65 @@ RSpec.describe User, type: :model do
 
         user.update(approved: true)
         user.update(approved: false)
+      end
+    end
+  end
+
+  describe 'base email taken' do
+    before do
+      stub_const('BaseEmailValidator::BASE_EMAIL_DOMAINS_VALIDATION', 'gmail.com, outlook.com')
+      stub_const('User::BASE_EMAIL_DOMAINS_VALIDATION', 'gmail.com, outlook.com')
+      stub_const('EmailHelper::BASE_EMAIL_DOMAINS_VALIDATION_STRIP_DOTS', 'gmail.com')
+    end
+
+    context 'when the e-mail domain is not added for base domain validation' do
+      before do
+        @user = User.create(email: 'alice@yahoo.com', account: Fabricate(:account), password: password, agreement: true)
+      end
+
+      it 'should allow a user to be created with "+"' do
+        user = User.new(email: 'alice+1@yahoo.com', account: Fabricate(:account), password: password, agreement: true)
+        expect(user.valid?).to be_truthy
+      end
+
+      it 'does not create a UserBaseEmail record' do
+        expect(UserBaseEmail.where(email: @user.email).first).to be_nil
+      end
+    end
+
+    context 'when the e-mail domain is  added for base domain validation' do
+      let(:user) { Fabricate(:user, email: 'alice@gmail.com') }
+      before do
+        @first_user = User.create(email: 'alice@gmail.com', account: Fabricate(:account), password: password, agreement: true)
+        @second_user = User.create(email: 'alice@outlook.com', account: Fabricate(:account), password: password, agreement: true)
+      end
+
+      it 'creates a UserBaseEmail record' do
+        expect(UserBaseEmail.where(email: @first_user.email).first).not_to be_nil
+        expect(UserBaseEmail.where(email: @second_user.email).first).not_to be_nil
+      end
+
+      context 'when the e-mail contains "+"' do
+        it 'should not allow a user to be created with "+"' do
+          user = User.new(email: 'alice+1@gmail.com', account: account, password: password, agreement: true)
+          expect(user.valid?).to be_falsey
+        end
+      end
+
+      context 'when the e-mail contains "."' do
+        context 'when the e-mail domain is added to trim "."' do
+          it 'should not allow a user to be created with "."' do
+            user = User.new(email: 'al.ice@gmail.com', account: account, password: password, agreement: true)
+            expect(user.valid?).to be_falsey
+          end
+        end
+
+        context 'when the e-mail domain is not added to trim "."' do
+          it 'should allow a user to be created with "."' do
+            user = User.new(email: 'al.ice@outlook.com', account: account, password: password, agreement: true)
+            expect(user.valid?).to be_truthy
+          end
+        end
       end
     end
   end

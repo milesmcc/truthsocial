@@ -6,7 +6,7 @@ class Scheduler::DoorkeeperCleanupScheduler
   sidekiq_options retry: 0
 
   def perform
-    Doorkeeper::AccessToken.where('revoked_at IS NOT NULL').where('revoked_at < NOW()').delete_all
+    OauthAccessToken.where('revoked_at IS NOT NULL').where('revoked_at < NOW()').delete_all
     Doorkeeper::AccessGrant.where('revoked_at IS NOT NULL').where('revoked_at < NOW()').delete_all
     SystemKey.expired.delete_all
   end

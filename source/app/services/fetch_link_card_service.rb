@@ -1,21 +1,12 @@
 # frozen_string_literal: true
-require "./lib/proto/serializers/card_joined_event.rb"
 
 class FetchLinkCardService < BaseService
-  URL_PATTERN = %r{
-    (#{Twitter::TwitterText::Regex[:valid_url_preceding_chars]})                                                                #   $1 preceeding chars
-    (                                                                                                                           #   $2 URL
-      (https?:\/\/)                                                                                                             #   $3 Protocol (required)
-      (#{Twitter::TwitterText::Regex[:valid_domain]})                                                                           #   $4 Domain(s)
-      (?::(#{Twitter::TwitterText::Regex[:valid_port_number]}))?                                                                #   $5 Port number (optional)
-      (/#{Twitter::TwitterText::Regex[:valid_url_path]}*)?                                                                      #   $6 URL Path and anchor
-      (\?#{Twitter::TwitterText::Regex[:valid_url_query_chars]}*#{Twitter::TwitterText::Regex[:valid_url_query_ending_chars]})? #   $7 Query String
-    )
-  }iox
+  include LinksParserConcern
 
-  def call(status, url = nil)
+  def call(status, url = nil, request_domain = nil)
     @status = status
-    @url    = url || parse_urls
+    @url = url || parse_urls
+    @request_domain = request_domain
 
     @known_oembed_paths = {
       "rumble.com": {
@@ -23,7 +14,6 @@ class FetchLinkCardService < BaseService
         format: :json,
       },
     }
-
     return if @url.nil? || @status.preview_cards.any?
 
     @url = @url.to_s
@@ -32,13 +22,13 @@ class FetchLinkCardService < BaseService
       parsed_uri = Addressable::URI.parse(full_url.to_s)
       check_known_short_links(parsed_uri)
 
-      Prometheus::ApplicationExporter::increment(:links, {domain: parsed_uri.normalized_host})
+      Prometheus::ApplicationExporter.increment(:links, { domain: parsed_uri.normalized_host })
     end
 
     RedisLock.acquire(lock_options) do |lock|
       if lock.acquired?
         @card = PreviewCard.find_by(url: @url)
-        process_url if @card.nil? || @card.updated_at <= 2.weeks.ago || @card.missing_image?
+        process_url if @card.nil? || @card.updated_at <= 2.weeks.ago || @card.missing_image? && !interactive_ad?
       else
         raise Mastodon::RaceConditionError
       end
@@ -48,7 +38,6 @@ class FetchLinkCardService < BaseService
       attach_card
       publish_card_joined_event
     end
-
   rescue HTTP::Error, OpenSSL::SSL::SSLError, Addressable::URI::InvalidURIError, Mastodon::HostValidationError, Mastodon::LengthValidationError => e
     Rails.logger.info "Error fetching link #{@url}: #{e}"
     nil
@@ -61,23 +50,19 @@ class FetchLinkCardService < BaseService
     path = uri.omit(:scheme, :authority, :host).to_s[1..-1]
 
     short_links = {
-      "youtu.be": "https://www.youtube.com/watch?v=#{path.sub('?', '&')}"
+      "youtu.be": "https://www.youtube.com/watch?v=#{path.sub('?', '&')}",
     }
 
     @url = short_links[domain.to_sym] if short_links[domain.to_sym]
   end
 
   def publish_card_joined_event
-    Redis.current.publish(
-      CardJoinedEvent::EVENT_KEY,
-      CardJoinedEvent.new(@card).serialize
-    )
+    EventProvider::EventProvider.new('card.joined', CardJoinedEvent, @card).call
   end
 
   def process_url
     @card ||= PreviewCard.new(url: @url)
-
-    attempt_oembed || attempt_opengraph
+    parsed_url.normalized_host == 'rumble.com' ? (attempt_oembed || attempt_opengraph) : (attempt_group || attempt_opengraph || attempt_oembed)
   end
 
   def html
@@ -97,7 +82,7 @@ class FetchLinkCardService < BaseService
   def attach_card
     @status.preview_cards << @card
     Rails.cache.delete(@status)
-    InvalidateSecondaryCacheService.new.call("InvalidateStatusCacheWorker", @status.id)
+    InvalidateSecondaryCacheService.new.call('InvalidateStatusCacheWorker', @status.id)
   end
 
   def parse_urls
@@ -108,13 +93,7 @@ class FetchLinkCardService < BaseService
       links = html.css(':not(.quote-inline) > a')
       @all_urls  = links.filter_map { |a| Addressable::URI.parse(a['href']) unless skip_link?(a) }.filter_map(&:normalize)
     end
-
-    @all_urls.reject { |uri| bad_url?(uri) }.first
-  end
-
-  def bad_url?(uri)
-    # Avoid local instance URLs and invalid URLs
-    uri.host.blank? || TagManager.instance.local_url?(uri.to_s) || !%w(http https).include?(uri.scheme)
+    @all_urls.reject { |uri| bad_url_with_group?(uri) }.first
   end
 
   # rubocop:disable Naming/MethodParameterName
@@ -132,20 +111,25 @@ class FetchLinkCardService < BaseService
 
   def attempt_oembed
     service         = FetchOEmbedService.new
-    url_domain      = Addressable::URI.parse(@url).normalized_host
+    url_domain      = parsed_url.normalized_host
     cached_endpoint = Rails.cache.read("oembed_endpoint:#{url_domain}")
 
     embed   = service.call(@url, cached_endpoint: cached_endpoint) unless cached_endpoint.nil?
     embed ||= service.call(@url, cached_endpoint: @known_oembed_paths[url_domain.to_sym]) if @known_oembed_paths.key?(url_domain.to_sym)
-    embed ||= service.call(@url, html: html) unless html.nil?
+
+    if !embed && !html.nil?
+      service.call(@url, html: html)
+    end
 
     return false if embed.nil?
 
     url = Addressable::URI.parse(service.endpoint_url)
 
+    raise Mastodon::UnexpectedResponseError, service.endpoint_url unless embed[:thumbnail_url].present?
+
     @card.type          = embed[:type]
     @card.title         = embed[:title].present? ? CGI.unescapeHTML(embed[:title]) : ''
-    @card.author_name   = embed[:author_name]   || ''
+    @card.author_name   = embed[:author_name] || ''
     @card.author_url    = embed[:author_url].present? ? (url + embed[:author_url]).to_s : ''
     @card.provider_name = embed[:provider_name] || ''
     @card.provider_url  = embed[:provider_url].present? ? (url + embed[:provider_url]).to_s : ''
@@ -202,10 +186,21 @@ class FetchLinkCardService < BaseService
 
     @card.title            = meta_property(page, 'og:title').presence || page.at_xpath('//title')&.content || ''
     @card.description      = meta_property(page, 'og:description').presence || meta_property(page, 'description') || ''
-    @card.image_remote_url = (Addressable::URI.parse(@url) + meta_property(page, 'og:image')).to_s if meta_property(page, 'og:image')
+    @card.image_remote_url = (parsed_url + meta_property(page, 'og:image')).to_s if meta_property(page, 'og:image')
 
     return if @card.title.blank? && @card.html.blank?
 
+    @card.save_with_optional_image!
+  end
+
+  def attempt_group
+    return unless group_url?(parsed_url.to_s)
+
+    group_slug = extract_group_slug(parsed_url.to_s)
+    group = Group.find_by!({ slug: group_slug.to_s })
+    @card.title = group.display_name
+    @card.description = group.note
+    @card.image_remote_url = full_asset_url(group.header_static_url) if group.header_file_name
     @card.save_with_optional_image!
   end
 
@@ -215,5 +210,13 @@ class FetchLinkCardService < BaseService
 
   def lock_options
     { redis: Redis.current, key: "fetch:#{@url}", autorelease: 15.minutes.seconds }
+  end
+
+  def interactive_ad?
+    !!@card&.statuses&.last&.ad
+  end
+
+  def parsed_url
+    Addressable::URI.parse(@url)
   end
 end

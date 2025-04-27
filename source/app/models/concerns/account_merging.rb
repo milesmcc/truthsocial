@@ -12,16 +12,17 @@ module AccountMerging
     # to check for (and skip past) uniqueness errors
 
     owned_classes = [
-      Status, StatusPin, MediaAttachment, Poll, Report, Tombstone, Favourite,
+      Status, StatusPin, MediaAttachment, Report, Tombstone, Favourite,
       Follow, FollowRequest, Block, Mute, AccountIdentityProof,
-      AccountModerationNote, AccountPin, AccountStat, ListAccount,
-      PollVote, Mention, AccountDeletionRequest, AccountNote, FollowRecommendationSuppression
+      AccountModerationNote, AccountPin, AccountFollowerStatistic, 
+      AccountFollowingStatistic, AccountStatusStatistic, ListAccount,
+      Mention, AccountDeletionRequest, AccountNote, FollowRecommendationSuppression
     ]
 
     owned_classes.each do |klass|
       klass.where(account_id: other_account.id).find_each do |record|
         record.update_attribute(:account_id, id)
-      rescue ActiveRecord::RecordNotUnique
+      rescue
         next
       end
     end
@@ -45,7 +46,7 @@ module AccountMerging
 
     # Some follow relationships have moved, so the cache is stale
     Rails.cache.delete_matched("followers_hash:#{id}:*")
-    Rails.cache.delete_matched("relationships:#{id}:*")
-    Rails.cache.delete_matched("relationships:*:#{id}")
+    Rails.cache.delete_matched("relationships/#{id}/*")
+    Rails.cache.delete_matched("relationships/*/#{id}")
   end
 end

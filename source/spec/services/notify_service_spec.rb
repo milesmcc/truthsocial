@@ -7,7 +7,7 @@ RSpec.describe NotifyService, type: :service do
 
   let(:user) { Fabricate(:user) }
   let(:recipient) { user.account }
-  let(:sender) { Fabricate(:account, domain: 'example.com') }
+  let(:sender) { Fabricate(:account, domain: 'example.com', url: 'http://example.com/account') }
   let(:activity) { Fabricate(:follow, account: sender, target_account: recipient) }
   let(:type) { :follow }
 
@@ -15,6 +15,11 @@ RSpec.describe NotifyService, type: :service do
 
   it 'does not notify when sender is blocked' do
     recipient.block!(sender)
+    is_expected.to_not change(Notification, :count)
+  end
+
+  it 'does not notify when recipient is blocked' do
+    sender.block!(recipient)
     is_expected.to_not change(Notification, :count)
   end
 
@@ -130,7 +135,7 @@ RSpec.describe NotifyService, type: :service do
 
     it 'sends an email' do
       expect(ActionMailer::Base.deliveries.count).to eq(1)
-      expect(ActionMailer::Base.deliveries[0].subject).to eq(I18n.t('notification_mailer.user_approved.web.subject'))
+      expect(ActionMailer::Base.deliveries[0].subject).to eq(I18n.t('notification_mailer.user_approved.title', name: user.account.username))
     end
 
     it 'builds the right notification json' do
@@ -195,37 +200,36 @@ RSpec.describe NotifyService, type: :service do
     end
   end
 
-
   describe 'whale users' do
     let(:user) { Fabricate(:user, account: Fabricate(:account, whale: true))}
-    let(:recipient) { user.account }   
-   
+    let(:recipient) { user.account }
+
     context 'if a whale user is followed' do
       let(:activity) { Fabricate(:follow, account: sender, target_account: recipient) }
       let(:type) { :follow }
-      
+
       it 'does not notify immediately' do
         group_notifications_service = double(:group_notifications_service)
         allow(group_notifications_service).to receive(:call)
         allow(GroupNotificationsService).to receive(:new).and_return(group_notifications_service)
-        
+
         is_expected.to_not change(Notification, :count)
-      
+
         expect(GroupNotificationsService).to have_received(:new)
         expect(group_notifications_service).to have_received(:call)
       end
     end
-   
+
     context 'if a whale\'s status is favourited' do
       let(:status)   { Fabricate(:status, account: recipient) }
       let(:activity) { Fabricate(:favourite, account: sender, status: status) }
       let(:type) { :favourite }
-     
+
       it 'does not notify immediately' do
         group_notifications_service = double(:group_notifications_service)
         allow(group_notifications_service).to receive(:call)
         allow(GroupNotificationsService).to receive(:new).and_return(group_notifications_service)
-        
+
         is_expected.to_not change(Notification, :count)
 
         expect(GroupNotificationsService).to have_received(:new)
@@ -237,12 +241,12 @@ RSpec.describe NotifyService, type: :service do
       let(:status)   { Fabricate(:status, account: recipient) }
       let(:activity) { Fabricate(:favourite, account: sender, status: status) }
       let(:type) { :reblog }
-     
+
       it 'does not notify immediately' do
         group_notifications_service = double(:group_notifications_service)
         allow(group_notifications_service).to receive(:call)
         allow(GroupNotificationsService).to receive(:new).and_return(group_notifications_service)
-        
+
         is_expected.to_not change(Notification, :count)
 
         expect(GroupNotificationsService).to have_received(:new)
@@ -254,7 +258,7 @@ RSpec.describe NotifyService, type: :service do
       let(:reply_to) { Fabricate(:status, account: sender) }
       let(:activity) { Fabricate(:mention, account: recipient, status: Fabricate(:status, account: sender, thread: reply_to)) }
       let(:type)     { :mention }
-  
+
       it 'does notify' do
         is_expected.to change(Notification, :count)
       end
@@ -264,12 +268,12 @@ RSpec.describe NotifyService, type: :service do
       let(:reply_to) { Fabricate(:status, account: recipient) }
       let(:activity) { Fabricate(:mention, account: recipient, status: Fabricate(:status, account: sender, thread: reply_to)) }
       let(:type)     { :mention }
-  
+
       it 'does not notify immediately' do
         group_notifications_service = double(:group_notifications_service)
         allow(group_notifications_service).to receive(:call)
         allow(GroupNotificationsService).to receive(:new).and_return(group_notifications_service)
-        
+
         is_expected.to_not change(Notification, :count)
 
         expect(GroupNotificationsService).to have_received(:new)
@@ -283,17 +287,37 @@ RSpec.describe NotifyService, type: :service do
       let(:reply_to_2) { Fabricate(:status, account: commenter, thread: reply_to_1) }
       let(:activity) { Fabricate(:mention, account: recipient, status: Fabricate(:status, account: sender, thread: reply_to_2)) }
       let(:type)     { :mention }
-  
+
       it 'does not notify immediately' do
         group_notifications_service = double(:group_notifications_service)
         allow(group_notifications_service).to receive(:call)
         allow(GroupNotificationsService).to receive(:new).and_return(group_notifications_service)
-        
+
         is_expected.to_not change(Notification, :count)
 
         expect(GroupNotificationsService).to have_received(:new)
         expect(group_notifications_service).to have_received(:call)
       end
+    end
+  end
+
+  describe 'all' do
+    let(:notification) { Fabricate(:notification, account: recipient, activity: activity) }
+
+    it 'includes the right JSON "extend" key' do
+      body = ActiveModelSerializers::SerializableResource.new(
+        notification,
+        serializer: Mobile::NotificationSerializer,
+        scope: OpenStruct.new(device_token: "a"),
+        scope_name: :current_push_subscription
+      ).as_json
+
+      expect(body[:extend].first['key']).to eq('truthLink')
+      expect(body[:extend].first['val']).to eq(sender.url)
+      expect(body[:extend].second['key']).to eq('title')
+      expect(body[:extend].second['val']).to eq('Truth Social')
+      expect(body[:extend].third['key']).to eq('accountId')
+      expect(body[:extend].third['val']).to eq(recipient.id.to_s)
     end
   end
 end

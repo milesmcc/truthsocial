@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2022_05_25_140644) do
+ActiveRecord::Schema.define(version: 2022_06_10_102254) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -181,8 +181,10 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.text "location", default: "", null: false
     t.text "website", default: "", null: false
     t.boolean "whale", default: false
+    t.integer "interactions_score"
     t.index "(((setweight(to_tsvector('simple'::regconfig, (display_name)::text), 'A'::\"char\") || setweight(to_tsvector('simple'::regconfig, (username)::text), 'B'::\"char\")) || setweight(to_tsvector('simple'::regconfig, (COALESCE(domain, ''::character varying))::text), 'C'::\"char\")))", name: "search_index", using: :gin
     t.index "lower((username)::text), COALESCE(lower((domain)::text), ''::text)", name: "index_accounts_on_username_and_domain_lower", unique: true
+    t.index ["interactions_score"], name: "index_accounts_on_interactions_score"
     t.index ["moved_to_account_id"], name: "index_accounts_on_moved_to_account_id"
     t.index ["uri"], name: "index_accounts_on_uri"
     t.index ["url"], name: "index_accounts_on_url"
@@ -278,6 +280,32 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.datetime "updated_at", precision: 6, null: false
     t.index ["canonical_email_hash"], name: "index_canonical_email_blocks_on_canonical_email_hash", unique: true
     t.index ["reference_account_id"], name: "index_canonical_email_blocks_on_reference_account_id"
+  end
+
+  create_table "chat_accounts", force: :cascade do |t|
+    t.bigint "account_id"
+    t.bigint "chat_id"
+    t.index ["account_id"], name: "index_chat_accounts_on_account_id"
+    t.index ["chat_id"], name: "index_chat_accounts_on_chat_id"
+  end
+
+  create_table "chat_messages", force: :cascade do |t|
+    t.bigint "account_id"
+    t.bigint "chat_id"
+    t.text "content"
+    t.boolean "unread", default: true, null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["account_id"], name: "index_chat_messages_on_account_id"
+    t.index ["chat_id"], name: "index_chat_messages_on_chat_id"
+  end
+
+  create_table "chats", force: :cascade do |t|
+    t.integer "unread"
+    t.bigint "created_by_account"
+    t.datetime "last_message"
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
   end
 
   create_table "conversation_mutes", force: :cascade do |t|
@@ -417,6 +445,14 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.index ["tag_id"], name: "index_featured_tags_on_tag_id"
   end
 
+  create_table "follow_deletes", force: :cascade do |t|
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.bigint "account_id", null: false
+    t.bigint "target_account_id", null: false
+    t.index ["account_id"], name: "index_follow_deletes_on_account_id"
+  end
+
   create_table "follow_recommendation_suppressions", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.datetime "created_at", precision: 6, null: false
@@ -445,6 +481,89 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.boolean "notify", default: false, null: false
     t.index ["account_id", "target_account_id"], name: "index_follows_on_account_id_and_target_account_id", unique: true
     t.index ["target_account_id"], name: "index_follows_on_target_account_id"
+  end
+
+  create_table "group_account_blocks", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "group_id", null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["account_id", "group_id"], name: "index_group_account_blocks_on_account_id_and_group_id", unique: true
+    t.index ["group_id"], name: "index_group_account_blocks_on_group_id"
+  end
+
+  create_table "group_deletion_requests", force: :cascade do |t|
+    t.bigint "group_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["group_id"], name: "index_group_deletion_requests_on_group_id"
+  end
+
+  create_table "group_membership_requests", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "group_id", null: false
+    t.string "uri"
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["account_id", "group_id"], name: "index_group_membership_requests_on_account_id_and_group_id", unique: true
+    t.index ["group_id"], name: "index_group_membership_requests_on_group_id"
+    t.index ["uri"], name: "index_group_membership_requests_on_uri", unique: true, opclass: :text_pattern_ops, where: "(uri IS NOT NULL)"
+  end
+
+  create_table "group_memberships", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "group_id", null: false
+    t.integer "role", default: 0, null: false
+    t.string "uri"
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["account_id", "group_id"], name: "index_group_memberships_on_account_id_and_group_id", unique: true
+    t.index ["group_id", "role"], name: "index_group_memberships_on_group_id_and_role"
+    t.index ["uri"], name: "index_group_memberships_on_uri", unique: true, opclass: :text_pattern_ops, where: "(uri IS NOT NULL)"
+  end
+
+  create_table "group_stats", force: :cascade do |t|
+    t.bigint "group_id", null: false
+    t.bigint "statuses_count", default: 0, null: false
+    t.bigint "members_count", default: 0, null: false
+    t.datetime "last_status_at"
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["group_id"], name: "index_group_stats_on_group_id", unique: true
+  end
+
+  create_table "groups", id: :bigint, default: -> { "timestamp_id('groups'::text)" }, force: :cascade do |t|
+    t.string "domain"
+    t.string "url"
+    t.text "note", default: "", null: false
+    t.string "display_name", default: "", null: false
+    t.boolean "locked", default: false, null: false
+    t.boolean "hide_members", default: false, null: false
+    t.datetime "suspended_at"
+    t.integer "suspension_origin"
+    t.boolean "discoverable"
+    t.string "avatar_file_name"
+    t.string "avatar_content_type"
+    t.bigint "avatar_file_size"
+    t.datetime "avatar_updated_at"
+    t.string "avatar_remote_url", default: "", null: false
+    t.string "header_file_name"
+    t.string "header_content_type"
+    t.bigint "header_file_size"
+    t.datetime "header_updated_at"
+    t.string "header_remote_url", default: "", null: false
+    t.integer "image_storage_schema_version"
+    t.string "uri"
+    t.string "outbox_url", default: "", null: false
+    t.string "inbox_url", default: "", null: false
+    t.string "shared_inbox_url", default: "", null: false
+    t.string "members_url", default: "", null: false
+    t.string "wall_url", default: "", null: false
+    t.text "private_key"
+    t.text "public_key", default: "", null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["uri"], name: "index_groups_on_uri", unique: true, opclass: :text_pattern_ops, where: "(uri IS NOT NULL)"
   end
 
   create_table "identities", force: :cascade do |t|
@@ -856,10 +975,12 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.bigint "in_reply_to_account_id"
     t.bigint "poll_id"
     t.datetime "deleted_at"
-    t.bigint "quote_id"
     t.bigint "deleted_by_id"
+    t.bigint "quote_id"
     t.index ["account_id", "id", "visibility", "updated_at"], name: "index_statuses_20190820", order: { id: :desc }, where: "(deleted_at IS NULL)"
     t.index ["conversation_id"], name: "index_statuses_on_conversation_id"
+    t.bigint "group_id"
+    t.index ["group_id"], name: "index_statuses_on_group_id", where: "(group_id IS NOT NULL)"
     t.index ["id", "account_id"], name: "index_statuses_local_20190824", order: { id: :desc }, where: "((local OR (uri IS NULL)) AND (deleted_at IS NULL) AND (visibility = 0) AND (reblog_of_id IS NULL) AND ((NOT reply) OR (in_reply_to_account_id = account_id)))"
     t.index ["id", "account_id"], name: "index_statuses_public_20200119", order: { id: :desc }, where: "((deleted_at IS NULL) AND (visibility = 0) AND (reblog_of_id IS NULL) AND ((NOT reply) OR (in_reply_to_account_id = account_id)))"
     t.index ["in_reply_to_account_id"], name: "index_statuses_on_in_reply_to_account_id"
@@ -975,6 +1096,7 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
     t.boolean "unsubscribe_from_emails", default: false
     t.integer "ready_to_approve", default: 0
     t.boolean "unauth_visibility"
+    t.string "attestation_challenge"
     t.index ["account_id"], name: "index_users_on_account_id"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["created_by_application_id"], name: "index_users_on_created_by_application_id"
@@ -1069,6 +1191,14 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
   add_foreign_key "follow_requests", "accounts", name: "fk_76d644b0e7", on_delete: :cascade
   add_foreign_key "follows", "accounts", column: "target_account_id", name: "fk_745ca29eac", on_delete: :cascade
   add_foreign_key "follows", "accounts", name: "fk_32ed1b5560", on_delete: :cascade
+  add_foreign_key "group_account_blocks", "accounts", on_delete: :cascade
+  add_foreign_key "group_account_blocks", "groups", on_delete: :cascade
+  add_foreign_key "group_deletion_requests", "groups", on_delete: :cascade
+  add_foreign_key "group_membership_requests", "accounts", on_delete: :cascade
+  add_foreign_key "group_membership_requests", "groups", on_delete: :cascade
+  add_foreign_key "group_memberships", "accounts", on_delete: :cascade
+  add_foreign_key "group_memberships", "groups", on_delete: :cascade
+  add_foreign_key "group_stats", "groups", on_delete: :cascade
   add_foreign_key "identities", "users", name: "fk_bea040f377", on_delete: :cascade
   add_foreign_key "imports", "accounts", name: "fk_6db1b6e408", on_delete: :cascade
   add_foreign_key "invites", "users", on_delete: :cascade
@@ -1110,6 +1240,7 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
   add_foreign_key "status_stats", "statuses", on_delete: :cascade
   add_foreign_key "statuses", "accounts", column: "in_reply_to_account_id", name: "fk_c7fa917661", on_delete: :nullify
   add_foreign_key "statuses", "accounts", name: "fk_9bda1543f7", on_delete: :cascade
+  add_foreign_key "statuses", "groups", on_delete: :cascade
   add_foreign_key "statuses", "statuses", column: "in_reply_to_id", on_delete: :nullify
   add_foreign_key "statuses", "statuses", column: "reblog_of_id", on_delete: :cascade
   add_foreign_key "statuses_tags", "statuses", on_delete: :cascade
@@ -1168,30 +1299,30 @@ ActiveRecord::Schema.define(version: 2022_05_25_140644) do
   add_index "account_summaries", ["account_id"], name: "index_account_summaries_on_account_id", unique: true
 
   create_view "follow_recommendations", materialized: true, sql_definition: <<-SQL
-      SELECT t0.account_id,
+    SELECT t0.account_id,
       sum(t0.rank) AS rank,
       array_agg(t0.reason) AS reason
-     FROM ( SELECT account_summaries.account_id,
+    FROM ( SELECT account_summaries.account_id,
               ((count(follows.id))::numeric / (1.0 + (count(follows.id))::numeric)) AS rank,
               'most_followed'::text AS reason
-             FROM (((follows
-               JOIN account_summaries ON ((account_summaries.account_id = follows.target_account_id)))
-               JOIN users ON ((users.account_id = follows.account_id)))
-               LEFT JOIN follow_recommendation_suppressions ON ((follow_recommendation_suppressions.account_id = follows.target_account_id)))
+            FROM (((follows
+              JOIN account_summaries ON ((account_summaries.account_id = follows.target_account_id)))
+              JOIN users ON ((users.account_id = follows.account_id)))
+              LEFT JOIN follow_recommendation_suppressions ON ((follow_recommendation_suppressions.account_id = follows.target_account_id)))
             WHERE ((users.current_sign_in_at >= (now() - 'P30D'::interval)) AND (account_summaries.sensitive = false) AND (follow_recommendation_suppressions.id IS NULL))
             GROUP BY account_summaries.account_id
-           HAVING (count(follows.id) >= 5)
+          HAVING (count(follows.id) >= 5)
           UNION ALL
-           SELECT account_summaries.account_id,
+          SELECT account_summaries.account_id,
               (sum((status_stats.reblogs_count + status_stats.favourites_count)) / (1.0 + sum((status_stats.reblogs_count + status_stats.favourites_count)))) AS rank,
               'most_interactions'::text AS reason
-             FROM (((status_stats
-               JOIN statuses ON ((statuses.id = status_stats.status_id)))
-               JOIN account_summaries ON ((account_summaries.account_id = statuses.account_id)))
-               LEFT JOIN follow_recommendation_suppressions ON ((follow_recommendation_suppressions.account_id = statuses.account_id)))
+            FROM (((status_stats
+              JOIN statuses ON ((statuses.id = status_stats.status_id)))
+              JOIN account_summaries ON ((account_summaries.account_id = statuses.account_id)))
+              LEFT JOIN follow_recommendation_suppressions ON ((follow_recommendation_suppressions.account_id = statuses.account_id)))
             WHERE ((statuses.id >= (((date_part('epoch'::text, (now() - 'P30D'::interval)) * (1000)::double precision))::bigint << 16)) AND (account_summaries.sensitive = false) AND (follow_recommendation_suppressions.id IS NULL))
             GROUP BY account_summaries.account_id
-           HAVING (sum((status_stats.reblogs_count + status_stats.favourites_count)) >= (5)::numeric)) t0
+          HAVING (sum((status_stats.reblogs_count + status_stats.favourites_count)) >= (5)::numeric)) t0
     GROUP BY t0.account_id
     ORDER BY (sum(t0.rank)) DESC;
   SQL

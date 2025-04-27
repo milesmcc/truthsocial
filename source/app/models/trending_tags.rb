@@ -13,23 +13,11 @@ class TrendingTags
   class << self
     include Redisable
 
-    def record_use!(tag, account, status: nil, at_time: Time.now.utc)
-      return unless tag.usable? && !account.silenced?
-
-      # Even if a tag is not allowed to trend, we still need to
-      # record the stats since they can be displayed in other places
-      increment_historical_use!(tag.id, at_time)
-      increment_unique_use!(tag.id, account.id, at_time)
-      increment_use!(tag.id, at_time)
-
-      # Only update when the tag was last used once every 12 hours
-      # and only if a status is given (lets use ignore reblogs)
-      tag.update(last_status_at: at_time) if status.present? && (tag.last_status_at.nil? || (tag.last_status_at < at_time && tag.last_status_at < 12.hours.ago))
-    end
+    def record_use!(tag, account, status: nil, at_time: Time.now.utc); end
 
     def update!(at_time = Time.now.utc)
       tag_ids = redis.smembers("#{KEY}:used:#{at_time.beginning_of_day.to_i}") + redis.zrange(KEY, 0, -1)
-      tags    = Tag.trendable.where(id: tag_ids.uniq)
+      tags    = Tag.where(trendable: true).where(id: tag_ids.uniq)
 
       # First pass to calculate scores and update the set
 

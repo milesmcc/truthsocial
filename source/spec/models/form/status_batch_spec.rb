@@ -36,6 +36,7 @@ describe Form::StatusBatch do
     let(:status_ids) { [status.id] }
     let(:action) { 'delete' }
     let!(:another_status) { Fabricate(:status) }
+    let!(:reblogged_status) { Fabricate(:status, reblog_of_id: status.id) }
 
     before do
       allow(RemovalWorker).to receive(:perform_async)
@@ -43,12 +44,20 @@ describe Form::StatusBatch do
 
     it 'call RemovalWorker' do
       form.save
-      expect(RemovalWorker).to have_received(:perform_async).with(status.id, immediate: true)
+      expect(RemovalWorker).to have_received(:perform_async).with(status.id, immediate: false)
     end
 
     it 'do not call RemovalWorker' do
       form.save
       expect(RemovalWorker).not_to have_received(:perform_async).with(another_status.id, immediate: true)
+    end
+
+    describe 'with a reblogged status' do
+      it 'soft deletes the parent status and its reblogs' do
+        form.save
+        expect(Status.with_discarded.find(status.id).deleted_at).to_not be_nil
+        expect(Status.with_discarded.find(reblogged_status.id).deleted_at).to_not be_nil
+      end
     end
   end
 end

@@ -25,13 +25,8 @@ class DistributionWorker
   end
 
   def send_to_bailey(status_id)
-    if @status.account.silenced? || !@status.public_visibility? || @status.reblog?
-      rendered = nil
-    else
-      rendered = InlineRenderer.render(@status, nil, :status)
-      rendered = Oj.dump(event: :update, payload: rendered)
-    end
-    Redis.current.lpush('elixir:distribution', Oj.dump(status_id: status_id, rendered: rendered))
-    Rails.logger.debug("bailey_debug: sending #{rendered.nil? ? 'nil' : 'value'} for rendered for status #{status_id}")
+    QueueManager.enqueue_status_for_author_distribution(status_id)
+    QueueManager.enqueue_status_for_follower_distribution(status_id)
+    Rails.logger.debug("bailey_debug: enqueuing status #{status_id}")
   end
 end

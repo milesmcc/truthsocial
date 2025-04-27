@@ -27,6 +27,6 @@ class AccountDomainBlock < ApplicationRecord
   end
 
   def remove_relationship_cache
-    Rails.cache.delete_matched("relationship:#{account_id}:*")
+    Rails.cache.delete_matched("relationship/#{account_id}/*")
   end
 end
