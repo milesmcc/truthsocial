@@ -1,0 +1,45 @@
+---
+io:
+  simple_form:
+    hints:
+      defaults:
+        avatar: En la formato PNG, GIF o JPG. Til %{size}. Esos mikrigita a %{dimensions}px
+        header: En la formato PNG, GIF o JPG. Til %{size}. Esos mikrigita a %{dimensions}px
+        locked: Tu devos aprobar omna demandi di sequado, e tua mesaji esos senchanje nur por tua sequanti.
+      imports:
+        data: Dosiero CSV de altra instaluro di Mastodon
+      sessions:
+        otp: Enter the Two-factor code from your phone or use one of your recovery codes.
+    labels:
+      defaults:
+        avatar: Profilimajo
+        confirm_new_password: Konfirmar nova pasvorto
+        confirm_password: Konfirmar nova pasvorto
+        current_password: Nuna pasvorto
+        data: Datumi
+        display_name: Publika nomo
+        location: loko
+        website: retejo
+        email: Retpost-adreso
+        header: Kapimajo
+        locale: Linguo
+        locked: Privatigar la konto
+        new_password: Nova pasvorto
+        note: Suprizento
+        otp_attempt: Dufaktora identigilo
+        password: Pasvorto
+        setting_default_privacy: Videbleso di la mesaji
+        type: Tipo di importaco
+        username: Uzernomo
+      interactions:
+        must_be_follower: Celar la savigi da homi, qui ne sequas tu
+        must_be_following: Celar la savigi da homi, quin tu ne sequas
+      notification_emails:
+        digest: Sendar rezuma retpost-mesaji
+        favourite: Sendar retpost-mesajo, kande ulu favoras mesajo da tu
+        follow: Sendar retpost-mesajo, kande ulu sequeskas tu
+        follow_request: Sendar retpost-mesajo, kande ulu diskonocigas mesajo da tu
+        mention: Sendar retpost-mesajo, kande ulu mencionas tu
+        reblog: Sendar retpost-mesajo, kande ulu diskonocigas mesajo da tu
+    required:
+      text: bezonata

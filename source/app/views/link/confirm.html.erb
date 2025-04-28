@@ -1,0 +1,36 @@
+<div class="public-layout-gradient link-warning">
+  <div class="link-warning-navbar">
+    <%= link_to root_url do %>
+      <%= svg_logo_full %>
+    <% end %>
+  </div>
+
+  <div class="link-warning-container">
+    <div class="container-sm">
+      <h1 class="link-warning-title text-center mb-2">
+        <%= t("links.title.default") %>
+      </h1>
+
+      <p class="link-warning-summary text-center">
+        <%= t("links.summary.default") %>
+      </p>
+
+      <p class="link-warning-summary text-center font-bold">
+        (<%= @link_url %>)
+      </p>
+
+      <div class="link-warning-actions-stacked text-center">
+        <%= link_to(@link_url, class: "link-warning-button link-warning-button-link link-warning-button-centered") do %>
+          <%= t("links.actions.go_to_site") %>
+        <% end %>
+
+        <button
+          class="link-warning-button link-warning-button-centered link-warning-button-primary link-warning-button-desktop"
+          data-behavior="close-window"
+        >
+          <%= t("links.actions.go_back") %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

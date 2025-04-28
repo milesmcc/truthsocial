@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+require 'bundler/setup'
+
+require './lib/rmq_consumers/status_worker'
+
+require 'sneakers/runner'
+require 'logger'
+
+Sneakers.configure(:amqp => ENV['RABBITMQ_URL'], :daemonize => false, :log => STDOUT, workers: 1)
+Sneakers.logger.level = Logger::INFO
+r = Sneakers::Runner.new([ StatusWorker ])
+
+r.run

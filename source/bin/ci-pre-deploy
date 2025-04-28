@@ -1,0 +1,24 @@
+#!/bin/sh -l
+
+# Dokku pre-deploy script.
+# https://github.com/dokku/ci-docker-image/pull/28
+
+# Generate a good-enough secret.
+# https://linuxize.com/post/bash-functions/
+generate_secret() {
+  < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;
+}
+
+# Only do this in GitLab CI.
+if [ "$GITLAB_CI" = "true" ]; then
+  ssh "$SSH_REMOTE" -- apps:create "$APP_NAME"
+  ssh "$SSH_REMOTE" -- config:set --no-restart "$APP_NAME" \
+      CUSTOM_RUBY_VERSION="2.7.2" \
+      REVIEW_APP="yes" \
+      REVIEW_APP_PASSWORD="$REVIEW_APP_PASSWORD" \
+      LOCAL_DOMAIN="$CI_ENVIRONMENT_SLUG.dokku.tmediatech.io" \
+      SECRET_KEY_BASE="$(generate_secret)" \
+      OTP_SECRET="$(generate_secret)" \
+      DOMAINS_TO_RETRY="" \
+      ENCRYPTION_SERVICE_SALT=""
+fi

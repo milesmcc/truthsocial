@@ -1,0 +1,81 @@
+# This file contains default values, and does not need to be edited. All
+# important settings can be changed from the admin interface.
+
+defaults: &defaults
+  site_title: Mastodon
+  site_short_description: ''
+  site_description: ''
+  site_extended_description: ''
+  site_terms: ''
+  site_contact_username: ''
+  site_contact_email: ''
+  registrations_mode: 'open'
+  profile_directory: true
+  closed_registrations_message: ''
+  open_deletion: true
+  min_invite_role: 'admin'
+  timeline_preview: true
+  show_staff_badge: true
+  default_sensitive: false
+  hide_network: false
+  unfollow_modal: false
+  boost_modal: false
+  delete_modal: true
+  auto_play_gif: true
+  display_media: 'default'
+  expand_spoilers: false
+  preview_sensitive_media: false
+  reduce_motion: false
+  disable_swiping: false
+  show_application: false
+  system_font_ui: false
+  noindex: false
+  theme: 'default'
+  aggregate_reblogs: false
+  advanced_layout: false
+  use_blurhash: true
+  use_pending_items: true
+  trends: false
+  trendable_by_default: false
+  crop_images: true
+  notification_emails:
+    follow: false
+    reblog: false
+    favourite: false
+    mention: false
+    follow_request: true
+    digest: true
+    report: true
+    pending_account: true
+    trending_tag: true
+  interactions:
+    must_be_follower: false
+    must_be_following: false
+    must_be_following_dm: false
+  reserved_usernames:
+    - admin
+    - support
+    - help
+    - root
+    - webmaster
+    - administrator
+    - mod
+    - moderator
+    - amtrak
+  disallowed_hashtags: # space separated string or list of hashtags without the hash
+  bootstrap_timeline_accounts: ''
+  activity_api_enabled: true
+  peers_api_enabled: true
+  show_known_fediverse_at_about_page: true
+  show_domain_blocks: 'disabled'
+  show_domain_blocks_rationale: 'disabled'
+  require_invite_text: false
+
+development:
+  <<: *defaults
+
+test:
+  <<: *defaults
+
+production:
+  <<: *defaults
