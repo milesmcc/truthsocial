@@ -18,3 +18,11 @@ jobs:
           author_name: R. Miles McCain
           author_email: github@sendmiles.email
           message: 'Update source'
+  keepalive-job:
+    name: Keepalive Workflow
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gautamkrishnar/keepalive-workflow@v2
