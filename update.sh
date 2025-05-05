@@ -1,7 +1,8 @@
 rm -rf source
 rm -rf source_tmp
 
-curl https://opensource.truthsocial.com/mastodon-current.zip > mastodon-current.zip
+pipx install yt-dlp[default,curl_cffi]
+yt-dlp --impersonate chrome --force-ipv4 https://opensource.truthsocial.com/mastodon-current.zip -o "mastodon-current.zip"||yt-dlp --impersonate chrome --force-ipv6 https://opensource.truthsocial.com/mastodon-current.zip -o "mastodon-current.zip"
 unzip mastodon-current.zip -d source_tmp
 
 mv source_tmp/open\ source source
