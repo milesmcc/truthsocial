@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "config:base"
+  ],
+  "js": {
+    "enabled": false
+  },
+  "node": {
+    "enabled": false
+  },
+  "rebaseWhen": "conflicted"
+}

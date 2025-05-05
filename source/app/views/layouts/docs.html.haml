@@ -1,0 +1,20 @@
+!!! 5
+%html{ lang: I18n.locale }
+  %head
+    %meta{ charset: 'utf-8' }/
+    %meta{ name: 'viewport', content: 'width=device-width, initial-scale=1' }/
+
+    %link{ rel: 'icon', href: favicon_path, type: 'image/x-icon' }/
+    %link{ rel: 'apple-touch-icon', sizes: '57x57', href: '/icons/icon-57x57.png' }/
+
+    %title Swagger UI
+
+    %link{ rel: 'stylesheet', href: '/docs.css', type: 'text/css' }/
+    = csrf_meta_tags
+    
+%body
+  = yield
+
+  %script{ src: '/swagger-ui-bundle.js' }
+  %script{ src: '/swagger-ui-standalone-preset.js' }
+  %script{ src: '/swagger-initializer.js' }

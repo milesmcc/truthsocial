@@ -1,0 +1,28 @@
+<%= t 'notification_mailer.user_approved.title', name: @resource.account.username %>
+
+<%= t 'notification_mailer.user_approved.full_handle' %>
+@<%= @resource.account.username %>
+
+===
+
+<%= t 'notification_mailer.user_approved.explanation' %>
+
+<%= t(
+  'notification_mailer.user_approved.extra_step',
+  help_center_link: t('notification_mailer.user_approved.help_center'),
+  mailto_support: 'support@truthsocial.com'
+) %>
+
+=> https://help.truthsocial.com
+
+<%= t("notification_mailer.user_approved.signoff") %>
+
+---
+
+<%= t('notification_mailer.user_approved.edit_profile_action') %>
+
+=> <%= short_account_url(@resource.account) %>
+
+If you no longer wish to receive transactional emails go here:
+
+<%= @url_string %>

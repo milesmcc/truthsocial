@@ -1,0 +1,2 @@
+Fabricator(:group) do
+end
